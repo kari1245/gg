@@ -117,8 +117,6 @@ function JobController:KnitStart()
 	
 	print("⛏️ [JobController] Creating UI with props:")
 	print("  - IsWorking:", Fusion.peek(IsWorking))
-	print("  - Stamina:", Fusion.peek(Stamina))
-	print("  - MaxStamina:", Fusion.peek(MaxStamina))
 	
 	local ui = View.New(scope, {
 		IsWorking = IsWorking,
