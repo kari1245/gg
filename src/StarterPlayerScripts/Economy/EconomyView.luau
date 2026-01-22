@@ -4,63 +4,72 @@ local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local EconomyView = {}
 
 function EconomyView.New(scope, props)
-	return scope:New "ScreenGui" {
-		Name = "UI_Economy",
-		ResetOnSpawn = false,
-		DisplayOrder = 10, -- Thấp hơn các bảng Popup
+	-- Hiệu ứng Gradient cho viền chạy chạy (Optional animation could go here)
 
+	return scope:New "ScreenGui" {
+		Name = "UI_Economy", ResetOnSpawn = false, DisplayOrder = 10,
 		[Fusion.Children] = {
 			scope:New "Frame" {
-				Name = "MoneyHUD",
-				Size = UDim2.new(0, 220, 0, 90),
-				Position = UDim2.new(0, 20, 1, -110),
-				BackgroundColor3 = Color3.fromRGB(10, 15, 20),
-				BackgroundTransparency = 0.2,
+				Name = "HoloCard",
+				Size = UDim2.new(0, 240, 0, 85),
+				Position = UDim2.new(0, 20, 1, -105),
+				BackgroundColor3 = Color3.fromRGB(10, 10, 15),
+				BackgroundTransparency = 0.3,
 
 				[Fusion.Children] = {
 					scope:New "UICorner" { CornerRadius = UDim.new(0, 12) },
-					scope:New "UIStroke" {
-						Color = Color3.fromRGB(0, 255, 150),
-						Thickness = 2,
-						Transparency = 0.5
-					},
-					scope:New "UIPadding" { PaddingTop = UDim.new(0, 10), PaddingLeft = UDim.new(0, 15) },
-					scope:New "UIListLayout" { FillDirection = "Vertical", Padding = UDim.new(0, 5) },
 
-					-- Wallet Display
-					scope:New "Frame" {
-						Size = UDim2.new(1, -15, 0, 30),
-						BackgroundTransparency = 1,
+					-- Viền Gradient Neon
+					scope:New "UIStroke" {
+						Thickness = 2,
+						Transparency = 0,
 						[Fusion.Children] = {
-							scope:New "UIListLayout" { FillDirection = "Horizontal", Padding = UDim.new(0, 10), VerticalAlignment = "Center" },
-							scope:New "TextLabel" {
-								Text = "💳", TextSize = 24, BackgroundTransparency = 1, Size = UDim2.fromOffset(30, 30)
-							},
-							scope:New "TextLabel" {
-								Text = scope:Computed(function(use) return "$" .. (use(props.Wallet) or 0) end),
-								TextColor3 = Color3.fromRGB(0, 255, 150),
-								Font = Enum.Font.Code, TextSize = 22,
-								AutomaticSize = "X", Size = UDim2.fromOffset(0, 30), BackgroundTransparency = 1,
-								TextXAlignment = "Left"
+							scope:New "UIGradient" {
+								Color = ColorSequence.new{
+									ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 255)), -- Cyan
+									ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 255))  -- Purple
+								},
+								Rotation = 45
 							}
 						}
 					},
 
-					-- Vault Display
+					-- Họa tiết lưới mờ (Tech Grid)
+					scope:New "ImageLabel" {
+						Size = UDim2.fromScale(1,1), BackgroundTransparency = 1,
+						Image = "rbxassetid://6071575925", -- Grid texture
+						ImageColor3 = Color3.fromRGB(0, 255, 255), ImageTransparency = 0.9,
+						ScaleType = "Tile", TileSize = UDim2.new(0, 30, 0, 30),
+						[Fusion.Children] = { scope:New "UICorner" { CornerRadius = UDim.new(0, 12) } }
+					},
+
+					-- Nội dung
 					scope:New "Frame" {
-						Size = UDim2.new(1, -15, 0, 30),
-						BackgroundTransparency = 1,
+						Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
 						[Fusion.Children] = {
-							scope:New "UIListLayout" { FillDirection = "Horizontal", Padding = UDim.new(0, 10), VerticalAlignment = "Center" },
+							scope:New "UIPadding" { PaddingLeft = UDim.new(0, 15), PaddingTop = UDim.new(0, 10) },
+							scope:New "UIListLayout" { FillDirection = "Vertical", Padding = UDim.new(0, 2) },
+
+							-- Wallet
 							scope:New "TextLabel" {
-								Text = "🏦", TextSize = 24, BackgroundTransparency = 1, Size = UDim2.fromOffset(30, 30)
+								Text = scope:Computed(function(use) return "💳 " .. (use(props.Wallet) or 0) end),
+								TextColor3 = Color3.fromRGB(0, 255, 255),
+								Font = Enum.Font.GothamBold, TextSize = 20,
+								Size = UDim2.new(1,0,0,30), BackgroundTransparency = 1, TextXAlignment = "Left",
+								[Fusion.Children] = {
+									scope:New "UIStroke" { Thickness = 1, Color = Color3.fromRGB(0, 100, 100), Transparency = 0.5 } -- Chữ có viền nhẹ
+								}
 							},
+
+							-- Vault
 							scope:New "TextLabel" {
-								Text = scope:Computed(function(use) return "$" .. (use(props.Vault) or 0) end),
-								TextColor3 = Color3.fromRGB(255, 200, 0),
-								Font = Enum.Font.Code, TextSize = 22,
-								AutomaticSize = "X", Size = UDim2.fromOffset(0, 30), BackgroundTransparency = 1,
-								TextXAlignment = "Left"
+								Text = scope:Computed(function(use) return "🏦 " .. (use(props.Vault) or 0) end),
+								TextColor3 = Color3.fromRGB(255, 200, 50),
+								Font = Enum.Font.GothamBold, TextSize = 20,
+								Size = UDim2.new(1,0,0,30), BackgroundTransparency = 1, TextXAlignment = "Left",
+								[Fusion.Children] = {
+									scope:New "UIStroke" { Thickness = 1, Color = Color3.fromRGB(100, 80, 0), Transparency = 0.5 }
+								}
 							}
 						}
 					}
