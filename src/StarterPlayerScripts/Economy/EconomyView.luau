@@ -1,75 +1,75 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
+local GameConfig = require(ReplicatedStorage.Common.GameConfig)
 
 local EconomyView = {}
+local Theme = GameConfig.CyberTheme
 
 function EconomyView.New(scope, props)
-	-- Hiệu ứng Gradient cho viền chạy chạy (Optional animation could go here)
-
 	return scope:New "ScreenGui" {
 		Name = "UI_Economy", ResetOnSpawn = false, DisplayOrder = 10,
 		[Fusion.Children] = {
 			scope:New "Frame" {
-				Name = "HoloCard",
-				Size = UDim2.new(0, 240, 0, 85),
-				Position = UDim2.new(0, 20, 1, -105),
-				BackgroundColor3 = Color3.fromRGB(10, 10, 15),
-				BackgroundTransparency = 0.3,
+				Name = "MoneyCard",
+				Size = UDim2.fromScale(0.18, 0.14),
+				Position = UDim2.fromScale(0.015, 0.84),
+				AnchorPoint = Vector2.new(0, 1),
+				BackgroundColor3 = Theme.DarkBg,
+				BackgroundTransparency = 0.15,
 
 				[Fusion.Children] = {
+					scope:New "UIAspectRatioConstraint" { AspectRatio = 1.3 },
 					scope:New "UICorner" { CornerRadius = UDim.new(0, 12) },
-
-					-- Viền Gradient Neon
 					scope:New "UIStroke" {
-						Thickness = 2,
-						Transparency = 0,
-						[Fusion.Children] = {
-							scope:New "UIGradient" {
-								Color = ColorSequence.new{
-									ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 255)), -- Cyan
-									ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 255))  -- Purple
-								},
-								Rotation = 45
-							}
-						}
+						Thickness = 2.5,
+						Color = Theme.NeonCyan,
+						Transparency = 0
 					},
 
-					-- Họa tiết lưới mờ (Tech Grid)
+					-- Grid background
 					scope:New "ImageLabel" {
 						Size = UDim2.fromScale(1,1), BackgroundTransparency = 1,
-						Image = "rbxassetid://6071575925", -- Grid texture
-						ImageColor3 = Color3.fromRGB(0, 255, 255), ImageTransparency = 0.9,
-						ScaleType = "Tile", TileSize = UDim2.new(0, 30, 0, 30),
+						Image = "rbxassetid://6071575925",
+						ImageColor3 = Theme.NeonCyan, ImageTransparency = 0.9,
+						ScaleType = "Tile", TileSize = UDim2.fromOffset(30, 30),
+						ZIndex = 0,
 						[Fusion.Children] = { scope:New "UICorner" { CornerRadius = UDim.new(0, 12) } }
 					},
 
-					-- Nội dung
+					-- Content
 					scope:New "Frame" {
-						Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
+						Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 2,
 						[Fusion.Children] = {
-							scope:New "UIPadding" { PaddingLeft = UDim.new(0, 15), PaddingTop = UDim.new(0, 10) },
-							scope:New "UIListLayout" { FillDirection = "Vertical", Padding = UDim.new(0, 2) },
+							scope:New "UIPadding" { 
+								PaddingLeft = UDim.new(0.05, 0), 
+								PaddingRight = UDim.new(0.05, 0),
+								PaddingTop = UDim.new(0.15, 0),
+								PaddingBottom = UDim.new(0.1, 0)
+							},
+							scope:New "UIListLayout" { 
+								FillDirection = "Vertical", 
+								Padding = UDim.new(0.08, 0),
+								HorizontalAlignment = "Center"
+							},
 
 							-- Wallet
 							scope:New "TextLabel" {
-								Text = scope:Computed(function(use) return "💳 " .. (use(props.Wallet) or 0) end),
-								TextColor3 = Color3.fromRGB(0, 255, 255),
-								Font = Enum.Font.GothamBold, TextSize = 20,
-								Size = UDim2.new(1,0,0,30), BackgroundTransparency = 1, TextXAlignment = "Left",
-								[Fusion.Children] = {
-									scope:New "UIStroke" { Thickness = 1, Color = Color3.fromRGB(0, 100, 100), Transparency = 0.5 } -- Chữ có viền nhẹ
-								}
+								Text = scope:Computed(function(use) return "▸ $" .. (use(props.Wallet) or 0) end),
+								TextColor3 = Theme.NeonCyan,
+								Font = Enum.Font.Code, TextScaled = true,
+								Size = UDim2.new(1, 0, 0.35, 0), BackgroundTransparency = 1,
+								TextStrokeTransparency = 0.5,
+								ZIndex = 3
 							},
 
 							-- Vault
 							scope:New "TextLabel" {
-								Text = scope:Computed(function(use) return "🏦 " .. (use(props.Vault) or 0) end),
-								TextColor3 = Color3.fromRGB(255, 200, 50),
-								Font = Enum.Font.GothamBold, TextSize = 20,
-								Size = UDim2.new(1,0,0,30), BackgroundTransparency = 1, TextXAlignment = "Left",
-								[Fusion.Children] = {
-									scope:New "UIStroke" { Thickness = 1, Color = Color3.fromRGB(100, 80, 0), Transparency = 0.5 }
-								}
+								Text = scope:Computed(function(use) return "▼ $" .. (use(props.Vault) or 0) end),
+								TextColor3 = Theme.NeonPink,
+								Font = Enum.Font.Code, TextScaled = true,
+								Size = UDim2.new(1, 0, 0.35, 0), BackgroundTransparency = 1,
+								TextStrokeTransparency = 0.5,
+								ZIndex = 3
 							}
 						}
 					}

@@ -9,10 +9,13 @@ local DataService = Knit.CreateService { Name = "DataService" }
 local ProfileTemplate = {
 	Wallet = GameConfig.StartingWallet,
 	Vault = GameConfig.StartingVault,
-	Stats = { Wins = 0, Losses = 0 },
 	UnlockedTitles = { "NO_DATA" },
 	CurrentTitle = "NO_DATA",
-	NftInventory = {}
+	NftInventory = {},
+	NftShopData = {
+		Items = {},
+		LastRefreshDay = 0 -- Lưu ngày refresh (dạng số ngày kể từ epoch)
+	}
 }
 
 local GameProfileStore = ProfileStore.New("Production_NFT_v3", ProfileTemplate) -- Đổi key v3 để reset data sạch sẽ

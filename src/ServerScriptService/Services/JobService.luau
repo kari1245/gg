@@ -4,43 +4,87 @@ local GameConfig = require(ReplicatedStorage.Common.GameConfig)
 
 local JobService = Knit.CreateService {
 	Name = "JobService",
-	Client = {
-		SubmitWork = Knit.CreateSignal() -- Client gọi hàm này (RemoteFunction style)
-	}
+	Client = {}
 }
 
--- Lưu từ khóa hiện tại của mỗi người chơi
-local ActiveJobs = {}
+local MiningConfig = GameConfig.MiningSystem
+
+-- Player mining data
+local PlayerMiningData = {}
+-- userId -> { LastMineTime = tick() }
 
 function JobService:KnitInit()
 	self.EconomyService = Knit.GetService("EconomyService")
 end
 
--- [NEW] Hàm Client gọi để lấy từ khóa mới
-function JobService.Client:RequestNewWord(player)
-	local words = GameConfig.JobSystem.Words
-	local word = words[math.random(1, #words)]
-	ActiveJobs[player] = word
-	return word
+function JobService:KnitStart()
+	local Players = game:GetService("Players")
+	
+	-- Connect PlayerRemoving
+	Players.PlayerRemoving:Connect(function(player)
+		self:PlayerRemoving(player)
+	end)
+	
+	print("⛏️ [JobService] Mining System Online")
 end
 
--- [FIX] Check đúng từ khóa Server đang lưu
-function JobService.Client:SubmitWork(player, inputWord)
-	local correctWord = ActiveJobs[player]
-	
-	if not correctWord then return false, "No active job" end
-	
-	if inputWord == correctWord then
-		local reward = GameConfig.JobSystem.Reward
-		self.Server.EconomyService:ModifyWallet(player, reward)
-		
-		-- Reset job
-		ActiveJobs[player] = nil
-		
-		return true, "Correct! +$" .. reward
-	else
-		return false, "Invalid Hash!"
+-- Initialize player data
+local function getPlayerData(player)
+	local userId = player.UserId
+	if not PlayerMiningData[userId] then
+		PlayerMiningData[userId] = {
+			LastMineTime = 0
+		}
 	end
+	return PlayerMiningData[userId]
+end
+
+-- Mine action với anti-cheat
+function JobService.Client:Mine(player)
+	local data = getPlayerData(player)
+	local now = tick()
+	
+	print("⛏️ [JobService] Mine request from", player.Name)
+	
+	-- Check cooldown
+	local timeSinceLastMine = now - data.LastMineTime
+	if timeSinceLastMine < MiningConfig.MineCooldown then
+		print("⛏️ [JobService] COOLDOWN for", player.Name)
+		return false, "COOLDOWN_ACTIVE", 0
+	end
+	
+	-- Update last mine time
+	data.LastMineTime = now
+	
+	-- Calculate reward (weighted random)
+	local totalWeight = 0
+	for _, reward in ipairs(MiningConfig.Rewards) do
+		totalWeight = totalWeight + reward.Weight
+	end
+	
+	local roll = math.random(1, totalWeight)
+	local currentWeight = 0
+	local selectedReward = MiningConfig.Rewards[1].Amount
+	
+	for _, reward in ipairs(MiningConfig.Rewards) do
+		currentWeight = currentWeight + reward.Weight
+		if roll <= currentWeight then
+			selectedReward = reward.Amount
+			break
+		end
+	end
+	
+	-- Give reward
+	self.Server.EconomyService:ModifyWallet(player, selectedReward)
+	
+	print("⛏️ [JobService] Mining SUCCESS for", player.Name, "- Reward:", selectedReward)
+	
+	return true, "SUCCESS", selectedReward
+end
+
+-- Cleanup khi player rời
+function JobService:PlayerRemoving(player)
+	PlayerMiningData[player.UserId] = nil
 end
 
 return JobService

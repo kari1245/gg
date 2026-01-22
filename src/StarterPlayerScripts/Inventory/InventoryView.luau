@@ -3,21 +3,34 @@ local Fusion = require(ReplicatedStorage.Packages.Fusion)
 local GameConfig = require(ReplicatedStorage.Common.GameConfig)
 
 local InventoryView = {}
+local Theme = GameConfig.CyberTheme
 
 local function CyberButton(scope, props)
-	-- ... (Copy hàm CyberButton y hệt ShopView)
 	local isHover = scope:Value(false)
 	local scale = scope:Spring(scope:Computed(function(use) return use(isHover) and 1.05 or 1 end), 40, 1)
+	
 	return scope:New "TextButton" {
 		Text = "", Size = props.Size, Position = props.Position, AnchorPoint = props.AnchorPoint,
-		BackgroundColor3 = Color3.fromRGB(20, 25, 35), BackgroundTransparency = props.Disabled and 0.5 or 0,
+		BackgroundColor3 = Theme.DarkBg, BackgroundTransparency = props.Disabled and 0.7 or 0.2,
+		AutoButtonColor = false,
 		[Fusion.OnEvent "MouseEnter"] = function() if not props.Disabled then isHover:set(true) end end,
 		[Fusion.OnEvent "MouseLeave"] = function() isHover:set(false) end,
 		[Fusion.OnEvent "Activated"] = function() if not props.Disabled and props.OnClick then props.OnClick() end end,
 		[Fusion.Children] = {
-			scope:New "UIScale" { Scale = scale }, scope:New "UICorner" { CornerRadius = UDim.new(0, 8) },
-			scope:New "UIStroke" { Thickness = 2, Transparency = 0, [Fusion.Children] = { scope:New "UIGradient" { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, props.Color or Color3.new(1,1,1)), ColorSequenceKeypoint.new(1, Color3.new(0,0,0))}, Rotation = 90 } } },
-			scope:New "TextLabel" { Text = props.Text or "", Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, TextColor3 = props.Color, Font = Enum.Font.GothamBlack, TextSize = 14, ZIndex = 2 }
+			scope:New "UIScale" { Scale = scale },
+			scope:New "UICorner" { CornerRadius = UDim.new(0, 8) },
+			scope:New "UIStroke" { Thickness = 2.5, Color = props.Color or Theme.NeonGreen, Transparency = 0 },
+			scope:New "ImageLabel" {
+				Size = UDim2.fromScale(1.15, 1.15), Position = UDim2.fromScale(0.5, 0.5),
+				AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1,
+				Image = "rbxassetid://5028857084", ImageColor3 = props.Color or Theme.NeonGreen,
+				ImageTransparency = 0.65, ZIndex = -1
+			},
+			scope:New "TextLabel" { 
+				Text = props.Text or "", Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, 
+				TextColor3 = props.Color or Theme.NeonGreen, Font = Enum.Font.Code, TextSize = 16,
+				TextStrokeTransparency = 0.5, ZIndex = 2 
+			}
 		}
 	}
 end
@@ -29,36 +42,74 @@ function InventoryView.New(scope, props)
 		Name = "UI_Inventory", ResetOnSpawn = false, DisplayOrder = 20,
 		[Fusion.Children] = {
 			CyberButton(scope, {
-				Text = "🎒", Size = UDim2.fromOffset(60, 60), Position = UDim2.new(0, 20, 0.5, 0),
-				Color = Color3.fromRGB(0, 255, 100), OnClick = props.OnToggle
+				Text = "◢ INV", Size = UDim2.new(0.065, 0, 0.09, 0), Position = UDim2.new(0.015, 0, 0.33, 0),
+				Color = Theme.NeonGreen, OnClick = props.OnToggle
 			}),
 
 			-- INVENTORY MODAL
 			scope:New "Frame" {
 				Visible = scope:Computed(function(use) return use(props.IsOpen) end),
-				Size = UDim2.fromScale(0.6, 0.7), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5),
-				BackgroundColor3 = Color3.fromRGB(15, 18, 25),
+				Size = UDim2.fromScale(0.65, 0.75), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5),
+				BackgroundColor3 = Theme.DarkBg,
+				BackgroundTransparency = 0.1,
 				[Fusion.Children] = {
-					scope:New "UICorner" { CornerRadius = UDim.new(0, 16) },
-					scope:New "UIStroke" { Thickness = 3, Color = Color3.fromRGB(0, 255, 100) },
+					scope:New "UICorner" { CornerRadius = UDim.new(0, 20) },
+					scope:New "UIAspectRatioConstraint" { AspectRatio = 0.87 },
+					scope:New "UIStroke" { Thickness = 3.5, Color = Theme.NeonGreen, Transparency = 0 },
 
-					scope:New "TextLabel" { Text = "YOUR WALLET", Size = UDim2.new(1, 0, 0, 70), BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(0, 255, 100), Font = Enum.Font.GothamBlack, TextSize = 36 },
-					CyberButton(scope, { Text = "✕", Size = UDim2.fromOffset(40, 40), Position = UDim2.new(1, -25, 0, 15), AnchorPoint = Vector2.new(1,0), Color = Color3.fromRGB(255, 80, 80), OnClick = props.OnClose }),
+					-- Grid background
+					scope:New "ImageLabel" {
+						Size = UDim2.fromScale(1,1), BackgroundTransparency = 1,
+						Image = "rbxassetid://6071575925", ImageColor3 = Theme.NeonGreen, ImageTransparency = 0.90,
+						ScaleType = "Tile", TileSize = UDim2.fromOffset(45, 45), ZIndex = 0,
+						[Fusion.Children] = { scope:New "UICorner" { CornerRadius = UDim.new(0, 20) } }
+					},
+
+					-- Header
+					scope:New "TextLabel" { 
+						Text = "◢◤ YOUR WALLET ◥◣", 
+						Size = UDim2.new(1, 0, 0.095, 0), BackgroundTransparency = 1, 
+						TextColor3 = Theme.NeonGreen, Font = Enum.Font.Code, TextScaled = true,
+						TextStrokeTransparency = 0.4, TextStrokeColor3 = Theme.NeonCyan,
+						ZIndex = 2
+					},
+					
+					CyberButton(scope, { 
+						Text = "✕", Size = UDim2.new(0.065, 0, 0.09, 0), Position = UDim2.new(0.98, 0, 0.015, 0), 
+						AnchorPoint = Vector2.new(1,0), Color = Theme.GlitchRed, OnClick = props.OnClose 
+					}),
 
 					scope:New "ScrollingFrame" {
-						Size = UDim2.new(1, -40, 1, -90), Position = UDim2.new(0, 20, 0, 80),
+						Size = UDim2.new(1, -45, 1, -95), Position = UDim2.fromOffset(22, 82),
 						BackgroundTransparency = 1, AutomaticCanvasSize = "Y", CanvasSize = UDim2.new(),
+						ScrollBarThickness = 8, ScrollBarImageColor3 = Theme.NeonGreen,
 						[Fusion.Children] = {
-							scope:New "UIGridLayout" { CellSize = UDim2.new(0, 150, 0, 100), CellPadding = UDim2.new(0, 10, 0, 10) },
+							scope:New "UIGridLayout" { 
+								CellSize = UDim2.fromScale(0.27, 0.16), 
+								CellPadding = UDim2.fromOffset(15, 15) 
+							},
 							scope:ForValues(props.NftList, function(use, inner, item)
 								local color = GameConfig.NftRarities[item.Rarity].Color
 								return inner:New "TextButton" {
-									BackgroundColor3 = Color3.fromRGB(25, 30, 40), AutoButtonColor = false,
+									BackgroundColor3 = Theme.MidBg,
+									BackgroundTransparency = 0.3,
+									AutoButtonColor = false,
 									[Fusion.OnEvent "Activated"] = function() inspectItem:set(item) end,
 									[Fusion.Children] = {
-										inner:New "UICorner" { CornerRadius = UDim.new(0,8) },
-										inner:New "UIStroke" { Color = color, Thickness = 2 },
-										inner:New "TextLabel" { Text = string.sub(item.Hash, 1, 6).."...", Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, TextColor3 = color, Font = Enum.Font.Code, TextSize = 18 }
+										inner:New "UICorner" { CornerRadius = UDim.new(0, 12) },
+										inner:New "UIStroke" { Color = color, Thickness = 3 },
+										inner:New "ImageLabel" {
+											Size = UDim2.fromScale(1.08, 1.08), Position = UDim2.fromScale(0.5, 0.5),
+											AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1,
+											Image = "rbxassetid://5028857084", ImageColor3 = color,
+											ImageTransparency = 0.75, ZIndex = 0
+										},
+										inner:New "TextLabel" { 
+											Text = "▸ " .. string.sub(item.Hash, 1, 6) .. "...", 
+											Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, 
+											TextColor3 = color, Font = Enum.Font.Code, TextScaled = true,
+											TextStrokeTransparency = 0.6, ZIndex = 2
+										}
 									}
 								}
 							end)
@@ -67,33 +118,83 @@ function InventoryView.New(scope, props)
 				}
 			},
 			
-			-- INSPECT MODAL (Tương tự Shop nhưng không có nút mua)
+			-- INSPECT MODAL
 			scope:New "Frame" {
 				Visible = scope:Computed(function(use) return use(inspectItem) ~= nil end),
-				Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 0.5, ZIndex = 10,
+				Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0,0,0), BackgroundTransparency = 0.3, ZIndex = 10,
 				[Fusion.Children] = {
 					scope:New "Frame" {
-						Size = UDim2.fromOffset(400, 250), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5),
-						BackgroundColor3 = Color3.fromRGB(15, 20, 25),
+						Size = UDim2.fromScale(0.65, 0.42), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5),
+						BackgroundColor3 = Theme.DarkBg,
+						BackgroundTransparency = 0.1,
 						[Fusion.Children] = {
-							scope:New "UICorner" { CornerRadius = UDim.new(0, 12) },
-							scope:New "UIStroke" { Color = Color3.fromRGB(0, 255, 100), Thickness = 2 },
-							
-							scope:New "TextLabel" {
-								Text = scope:Computed(function(use) local item = use(inspectItem); return item and ("HASH: " .. item.Hash) or "" end),
-								Size = UDim2.new(0.9, 0, 0, 100), Position = UDim2.new(0.05, 0, 0.1, 0),
-								BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(0, 255, 100), Font = Enum.Font.Code, TextSize = 24, TextWrapped = true
+							scope:New "UICorner" { CornerRadius = UDim.new(0, 16) },
+							scope:New "UIAspectRatioConstraint" { AspectRatio = 1.4 },
+							scope:New "UIStroke" { 
+								Color = scope:Computed(function(use)
+									local item = use(inspectItem)
+									return item and (GameConfig.NftRarities[item.Rarity] or {}).Color or Theme.NeonGreen
+								end),
+								Thickness = 4
 							},
 							
+							-- Grid background
+							scope:New "ImageLabel" {
+								Size = UDim2.fromScale(1,1), BackgroundTransparency = 1,
+								Image = "rbxassetid://6071575925",
+								ImageColor3 = scope:Computed(function(use)
+									local item = use(inspectItem)
+									return item and (GameConfig.NftRarities[item.Rarity] or {}).Color or Theme.NeonGreen
+								end),
+								ImageTransparency = 0.9, ScaleType = "Tile", TileSize = UDim2.fromOffset(40, 40),
+								ZIndex = 0,
+								[Fusion.Children] = { scope:New "UICorner" { CornerRadius = UDim.new(0, 16) } }
+							},
+							
+							-- Header
 							scope:New "TextLabel" {
-								Text = scope:Computed(function(use) local item = use(inspectItem); return item and ("RARITY: " .. item.Rarity:upper()) or "" end),
-								Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromScale(0, 0.6),
-								BackgroundTransparency = 1, TextColor3 = Color3.new(1,1,1), Font = Enum.Font.GothamBlack, TextSize = 20
+								Text = "◢ NFT DATA ◣",
+								Size = UDim2.new(1, 0, 0.17, 0), BackgroundTransparency = 1,
+								TextColor3 = Theme.NeonGreen, Font = Enum.Font.Code, TextScaled = true,
+								TextStrokeTransparency = 0.5, ZIndex = 2
+							},
+							
+							-- Hash
+							scope:New "TextLabel" {
+								Text = scope:Computed(function(use) 
+									local item = use(inspectItem)
+									return item and ("▸ HASH:\n" .. item.Hash) or "" 
+								end),
+								Size = UDim2.new(0.9, 0, 0.37, 0), Position = UDim2.new(0.05, 0, 0.2, 0),
+								BackgroundTransparency = 1, 
+								TextColor3 = scope:Computed(function(use)
+									local item = use(inspectItem)
+									return item and (GameConfig.NftRarities[item.Rarity] or {}).Color or Theme.NeonGreen
+								end),
+								Font = Enum.Font.Code, TextScaled = true, TextWrapped = true,
+								TextXAlignment = "Left", TextYAlignment = "Top",
+								TextStrokeTransparency = 0.7, ZIndex = 2
+							},
+							
+							-- Rarity
+							scope:New "TextLabel" {
+								Text = scope:Computed(function(use) 
+									local item = use(inspectItem)
+									return item and ("◤ " .. item.Rarity:upper() .. " ◥") or "" 
+								end),
+								Size = UDim2.new(1, 0, 0.13, 0), Position = UDim2.fromScale(0, 0.63),
+								BackgroundTransparency = 1,
+								TextColor3 = scope:Computed(function(use)
+									local item = use(inspectItem)
+									return item and (GameConfig.NftRarities[item.Rarity] or {}).Color or Theme.NeonGreen
+								end),
+								Font = Enum.Font.GothamBlack, TextScaled = true,
+								TextStrokeTransparency = 0.3, ZIndex = 2
 							},
 							
 							CyberButton(scope, {
-								Text = "CLOSE", Size = UDim2.new(0.3, 0, 0, 40), Position = UDim2.new(0.35, 0, 0.8, 0),
-								Color = Color3.fromRGB(255, 255, 255),
+								Text = "✕ CLOSE", Size = UDim2.new(0.35, 0, 0, 45), Position = UDim2.new(0.325, 0, 0.82, 0),
+								Color = Theme.GlitchRed,
 								OnClick = function() inspectItem:set(nil) end
 							})
 						}

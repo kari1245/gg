@@ -82,7 +82,6 @@ function AchievementService:Check(player)
 		if not has then
 			local passed = false
 			if ach.Type == "Wallet" and data.Wallet >= ach.Val then passed = true end
-			if ach.Type == "Wins" and data.Stats.Wins >= ach.Val then passed = true end
 
 			if passed then
 				table.insert(data.UnlockedTitles, ach.Title)
