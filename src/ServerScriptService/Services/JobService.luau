@@ -1,48 +1,46 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Common.GameConfig)
 
-local JobService = Knit.CreateService { Name = "JobService", Client = {} }
+local JobService = Knit.CreateService {
+	Name = "JobService",
+	Client = {
+		SubmitWork = Knit.CreateSignal() -- Client gọi hàm này (RemoteFunction style)
+	}
+}
 
-local COOLDOWN = 1.2
-local LastSubmission = {}
+-- Lưu từ khóa hiện tại của mỗi người chơi
+local ActiveJobs = {}
 
 function JobService:KnitInit()
-	self.DataService = Knit.GetService("DataService")
-	self.EconomyService = Knit.GetService("EconomyService") -- [FIX] Cần cái này để trả lương
-
-	Players.PlayerRemoving:Connect(function(player) LastSubmission[player] = nil end)
+	self.EconomyService = Knit.GetService("EconomyService")
 end
 
-function JobService:CompleteJob(player)
-	local now = os.clock()
-	local last = LastSubmission[player] or 0
+-- [NEW] Hàm Client gọi để lấy từ khóa mới
+function JobService.Client:RequestNewWord(player)
+	local words = GameConfig.JobSystem.Words
+	local word = words[math.random(1, #words)]
+	ActiveJobs[player] = word
+	return word
+end
 
-	-- 1. Anti-Spam
-	if (now - last) < COOLDOWN then return false end
-
-	-- 2. Check Ngồi Ghế
-	local char = player.Character
-	local hum = char and char:FindFirstChild("Humanoid")
-	local seat = hum and hum.SeatPart
-	if not seat or seat.Name ~= "JobSeat" then return false end
-
-	LastSubmission[player] = now
-
-	-- 3. Trả Lương [FIX] Dùng EconomyService
-	local reward = GameConfig.JobSystem.Reward or 50
-	local success = self.EconomyService:ModifyWallet(player, reward)
-
-	if success then
-		print("💻 Job Paid:", player.Name, "+$"..reward)
-		return true
+-- [FIX] Check đúng từ khóa Server đang lưu
+function JobService.Client:SubmitWork(player, inputWord)
+	local correctWord = ActiveJobs[player]
+	
+	if not correctWord then return false, "No active job" end
+	
+	if inputWord == correctWord then
+		local reward = GameConfig.JobSystem.Reward
+		self.Server.EconomyService:ModifyWallet(player, reward)
+		
+		-- Reset job
+		ActiveJobs[player] = nil
+		
+		return true, "Correct! +$" .. reward
+	else
+		return false, "Invalid Hash!"
 	end
-	return false
-end
-
-function JobService.Client:SubmitJob(player) 
-	return self.Server:CompleteJob(player) 
 end
 
 return JobService

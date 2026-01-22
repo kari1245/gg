@@ -2,55 +2,82 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local GameConfig = require(ReplicatedStorage.Common.GameConfig)
 
-local ShopService = Knit.CreateService { Name = "ShopService", Client = {} }
+local ShopService = Knit.CreateService {
+	Name = "ShopService",
+	Client = {
+		ShopUpdated = Knit.CreateSignal(),
+		BuyItem = Knit.CreateSignal()
+	}
+}
 
--- Generate Shop mỗi ngày
-local DailyShop = {}
-local function GenerateShop()
-	DailyShop = {}
-	local weightedList = {}
-	-- Tạo danh sách theo trọng số (giữ nguyên logic cũ của bạn)
-	-- ... (Giả sử logic generate shop của bạn ở đây) ...
-
-	-- [VÍ DỤ ĐƠN GIẢN] Nếu bạn chưa có logic random, dùng tạm cái này:
-	local allItems = {}
-	for _, v in ipairs(GameConfig.Cosmetics) do table.insert(allItems, v.ID) end
-	for i = 1, GameConfig.ShopSettings.DailySlots do
-		table.insert(DailyShop, allItems[math.random(1, #allItems)])
-	end
-	print("🛒 Daily Shop Generated:", table.concat(DailyShop, ", "))
-end
+local PlayerShops = {}
 
 function ShopService:KnitInit()
 	self.DataService = Knit.GetService("DataService")
-	self.EconomyService = Knit.GetService("EconomyService") -- Gọi qua Economy để trừ tiền
-	self.InventoryService = Knit.GetService("InventoryService") -- Gọi Inventory để thêm đồ
-	GenerateShop()
+	self.EcoService = Knit.GetService("EconomyService")
+	self.InvService = Knit.GetService("InventoryService")
+	self.NftService = Knit.GetService("NftService")
 end
 
-function ShopService:BuyItem(player, itemId)
-	-- 1. Validate Item trong Daily Shop
-	local valid = false
-	for _, id in ipairs(DailyShop) do if id == itemId then valid = true; break end end
-
-	local itemInfo = GameConfig.GetItemInfo(itemId)
-	if not valid or not itemInfo then return false end
-
-	-- 2. Check tiền & Trừ tiền
-	local profile = self.DataService:GetProfile(player)
-	if not profile then return false end
-
-	local price = GameConfig.GetPrice(itemId)
-	if profile.Data.Wallet >= price then
-		self.EconomyService:ModifyWallet(player, -price)
-		self.InventoryService:AddItem(player, "Cosmetic", itemId) -- Luôn là Cosmetic
-		return true
+function ShopService:GenerateDailyShop(player)
+	local items = {}
+	for i = 1, GameConfig.ShopSettings.DailySlots do
+		table.insert(items, self.NftService:GenerateNft())
 	end
-
-	return false
+	PlayerShops[player] = items
+	self.Client.ShopUpdated:Fire(player, items)
+	print("🛒 Shop generated for", player.Name)
 end
 
-function ShopService.Client:GetDailyShop(player) return DailyShop end
-function ShopService.Client:BuyItem(player, itemId) return self.Server:BuyItem(player, itemId) end
+function ShopService.Client:BuyNft(player, hash)
+	local server = self.Server
+	print("🛒 Buy Request:", player.Name, hash) -- Debug log
+	
+	local shopItems = PlayerShops[player]
+	if not shopItems then 
+		server:GenerateDailyShop(player)
+		shopItems = PlayerShops[player]
+	end
+	
+	local selectedNft = nil
+	for _, item in ipairs(shopItems) do
+		if item.Hash == hash then selectedNft = item; break end
+	end
+	
+	if not selectedNft then 
+		warn("❌ Item not found in shop")
+		return false, "Item invalid" 
+	end
+	
+	if selectedNft.Sold then 
+		warn("❌ Item already sold")
+		return false, "Sold out" 
+	end
+	
+	-- [FIX] Dùng WaitForProfile để chắc chắn Data đã load
+	local profile = server.DataService:WaitForProfile(player)
+	if not profile then return false, "Data loading..." end
+	
+	if profile.Data.Wallet >= selectedNft.Price then
+		server.EcoService:ModifyWallet(player, -selectedNft.Price)
+		server.InvService:AddNft(player, selectedNft)
+		
+		selectedNft.Sold = true
+		server.Client.ShopUpdated:Fire(player, shopItems)
+		
+		print("✅ Buy Success!")
+		return true, "Success"
+	else
+		warn("❌ Not enough money")
+		return false, "Not enough money"
+	end
+end
+
+function ShopService.Client:GetShopData(player)
+	if not PlayerShops[player] then
+		self.Server:GenerateDailyShop(player)
+	end
+	return PlayerShops[player]
+end
 
 return ShopService
