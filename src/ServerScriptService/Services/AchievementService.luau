@@ -8,11 +8,10 @@ local AchievementService = Knit.CreateService {
 	Client = { AchievementUpdated = Knit.CreateSignal() }
 }
 
--- Hàm Update Visual (Chạy mượt, không yield)
+-- Hàm Update Visual (Overhead)
 local function UpdateOverhead(player, title)
 	if not player then return end
 	task.spawn(function()
-		-- Đợi tối đa 10s để nhân vật load
 		if not player.Parent then return end
 		local char = player.Character or player.CharacterAdded:Wait()
 		local head = char:WaitForChild("Head", 10)
@@ -31,8 +30,17 @@ local function UpdateOverhead(player, title)
 		local lbl = Instance.new("TextLabel")
 		lbl.Size = UDim2.fromScale(1, 1)
 		lbl.BackgroundTransparency = 1
-		lbl.Text = "<" .. (title or "NO_DATA") .. ">"
-		lbl.TextColor3 = GameConfig.Colors.Gold
+		-- Nếu title là NO_DATA thì ẩn hoặc hiện text mặc định
+		local displayTitle = (title == "NO_DATA") and "NO TITLE" or title
+		lbl.Text = "<" .. displayTitle .. ">"
+
+		-- [FIX] Màu xanh nếu là title xịn, màu xám nếu là NO_DATA
+		if title == "NO_DATA" then
+			lbl.TextColor3 = Color3.fromRGB(150, 150, 150)
+		else
+			lbl.TextColor3 = GameConfig.Colors.Gold or Color3.fromRGB(255, 200, 0)
+		end
+
 		lbl.TextStrokeTransparency = 0
 		lbl.Font = Enum.Font.Code
 		lbl.TextSize = 24
@@ -51,19 +59,9 @@ function AchievementService:KnitInit()
 	end)
 end
 
--- [FIX QUAN TRỌNG Ở ĐÂY]
 function AchievementService:OnDataLoaded(player, data)
-	-- 1. Kiểm tra ngay lập tức xem stats hiện tại có đạt achievement nào không
-	-- (Ví dụ: Mới vào có sẵn 1000$ -> Phải unlock luôn title 500$)
 	self:Check(player)
-
-	-- 2. Sau khi Check xong (đã unlock title mới nếu có), mới gửi về Client
-	-- Lưu ý: Hàm Check đã update data, nên ta cần lấy lại data mới nhất nếu muốn chắc ăn,
-	-- hoặc chỉ cần gọi Check là đủ vì Check sẽ tự Fire Client nếu có thay đổi.
-	-- Tuy nhiên, để an toàn cho lần load đầu, ta vẫn Fire force 1 lần.
 	self.Client.AchievementUpdated:Fire(player, data.UnlockedTitles, data.CurrentTitle)
-
-	-- 3. Hiện visual
 	if player.Character then 
 		UpdateOverhead(player, data.CurrentTitle) 
 	end
@@ -88,7 +86,7 @@ function AchievementService:Check(player)
 
 			if passed then
 				table.insert(data.UnlockedTitles, ach.Title)
-				print("🏆 UNLOCKED (Init Check):", ach.Title)
+				print("🏆 UNLOCKED:", ach.Title)
 				changed = true
 			end
 		end
@@ -104,6 +102,15 @@ function AchievementService.Client:EquipTitle(player, title)
 	if not profile then return false end
 	local data = profile.Data
 
+	-- [FIX] Cho phép equip NO_DATA luôn thành công
+	if title == "NO_DATA" then
+		data.CurrentTitle = title
+		UpdateOverhead(player, title)
+		self.Server.Client.AchievementUpdated:Fire(player, data.UnlockedTitles, title)
+		return true
+	end
+
+	-- Check sở hữu các title khác
 	local has = false
 	for _, t in ipairs(data.UnlockedTitles) do 
 		if t == title then has = true; break end 
@@ -115,6 +122,7 @@ function AchievementService.Client:EquipTitle(player, title)
 		self.Server.Client.AchievementUpdated:Fire(player, data.UnlockedTitles, data.CurrentTitle)
 		return true
 	end
+
 	return false
 end
 
