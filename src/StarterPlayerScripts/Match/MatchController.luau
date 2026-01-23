@@ -27,8 +27,29 @@ function MatchController:KnitStart()
 	local MaxPlayers = scope:Value(3)
 	local CountdownTimer = scope:Value(0)
 
-	-- Seat Logic
+	-- Seat Logic (optional - keep for backward compatibility)
 	local player = Players.LocalPlayer
+	
+	-- Public method to join game directly (without seat)
+	function self:JoinGameDirectly()
+		if not Fusion.peek(IsSitting) then
+			print("[MATCH CTRL] Joining game directly (no seat)")
+			IsSitting:set(true)
+			CurrentSeat:set("DirectJoin")
+			self.MatchService:JoinGame("DirectJoin")
+		end
+	end
+	
+	-- Public method to leave game
+	function self:LeaveGameDirectly()
+		if Fusion.peek(IsSitting) then
+			print("[MATCH CTRL] Leaving game")
+			self.MatchService:LeaveGame(Fusion.peek(CurrentSeat))
+			IsSitting:set(false)
+			CurrentSeat:set(nil)
+		end
+	end
+	
 	local function onChar(char)
 		local hum = char:WaitForChild("Humanoid")
 		hum.Seated:Connect(function(active, seat)
@@ -115,6 +136,9 @@ function MatchController:KnitStart()
 			if seat then
 				self.MatchService:Stand(seat)
 			end
+		end,
+		OnLeave = function()
+			self:LeaveGameDirectly()
 		end
 	})
 	ui.Parent = player:WaitForChild("PlayerGui")

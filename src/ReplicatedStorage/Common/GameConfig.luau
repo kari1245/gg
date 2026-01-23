@@ -22,24 +22,31 @@ GameConfig.NftRarities = {
 	Glitch    = { Weight = 1,    Mult = 1000, Color = Color3.fromRGB(255, 0, 0),     Name = "GLITCH // ERROR" },
 }
 
--- [[ 4. ACHIEVEMENTS ]]
+-- [[ 4. ACHIEVEMENTS - Based on Wallet balance ]]
 GameConfig.Achievements = {
-	{ ID = "RICH_1", Type = "Wallet", Val = 1000, Title = "CRYPTO_TRADER", Desc = "Hold $1,000" },
+	{ ID = "RICH_1", Type = "Wallet", Val = 100, Title = "FIRST_STEPS", Desc = "Hold $100 in wallet", Color = Color3.fromRGB(150, 150, 150), Icon = "◇" },
+	{ ID = "RICH_2", Type = "Wallet", Val = 500, Title = "HUSTLER", Desc = "Hold $500 in wallet", Color = Color3.fromRGB(100, 255, 100), Icon = "◈" },
+	{ ID = "RICH_3", Type = "Wallet", Val = 1000, Title = "ENTREPRENEUR", Desc = "Hold $1,000 in wallet", Color = Color3.fromRGB(0, 255, 150), Icon = "◆" },
+	{ ID = "RICH_4", Type = "Wallet", Val = 5000, Title = "INVESTOR", Desc = "Hold $5,000 in wallet", Color = Color3.fromRGB(0, 200, 255), Icon = "▣" },
+	{ ID = "RICH_5", Type = "Wallet", Val = 10000, Title = "WHALE", Desc = "Hold $10,000 in wallet", Color = Color3.fromRGB(50, 255, 200), Icon = "◉" },
+	{ ID = "RICH_6", Type = "Wallet", Val = 50000, Title = "TYCOON", Desc = "Hold $50,000 in wallet", Color = Color3.fromRGB(170, 0, 255), Icon = "⬢" },
+	{ ID = "RICH_7", Type = "Wallet", Val = 100000, Title = "MILLIONAIRE", Desc = "Hold $100,000 in wallet", Color = Color3.fromRGB(255, 215, 0), Icon = "⬣" },
+	{ ID = "RICH_8", Type = "Wallet", Val = 500000, Title = "LEGEND", Desc = "Hold $500,000 in wallet", Color = Color3.fromRGB(255, 100, 0), Icon = "⯁" },
+	{ ID = "RICH_9", Type = "Wallet", Val = 1000000, Title = "DIAMOND_HANDS", Desc = "Hold $1,000,000 in wallet", Color = Color3.fromRGB(185, 242, 255), Icon = "◬" },
 }
 
--- [[ 5. MINING SYSTEM ]]
-GameConfig.MiningSystem = {
-	MaxStamina = 100, -- Stamina tối đa
-	StaminaCost = 10, -- Stamina mỗi lần đào
-	StaminaRegenRate = 5, -- Stamina hồi mỗi giây
-	MineCooldown = 1.5, -- Cooldown giữa các lần đào (giây)
-	Rewards = { -- Random reward mỗi lần đào
-		{ Amount = 20, Weight = 500 },  -- 20$ - Common
-		{ Amount = 50, Weight = 300 },  -- 50$ - Uncommon  
-		{ Amount = 100, Weight = 150 }, -- 100$ - Rare
-		{ Amount = 250, Weight = 40 },  -- 250$ - Epic
-		{ Amount = 500, Weight = 10 },  -- 500$ - Legendary
-	}
+-- [[ 5. NFT EARNING SYSTEM ]]
+GameConfig.NftEarning = {
+	-- Passive income by equipping NFT (works offline)
+	Earning = {
+		Common    = { HourlyRate = 10 },    -- $10/hour
+		Uncommon  = { HourlyRate = 25 },    -- $25/hour
+		Rare      = { HourlyRate = 60 },    -- $60/hour
+		Epic      = { HourlyRate = 150 },   -- $150/hour
+		Legendary = { HourlyRate = 400 },   -- $400/hour
+		Glitch    = { HourlyRate = 1500 },  -- $1500/hour
+	},
+	MaxEquippedSlots = 3  -- Max 3 NFT equipped at once
 }
 
 -- [[ 6. BLACKJACK ]]
@@ -73,6 +80,7 @@ GameConfig.CyberTheme = {
 	GlitchBlue = Color3.fromRGB(0, 150, 255),
 	GridColor = Color3.fromRGB(0, 255, 255),
 	ScanlineColor = Color3.fromRGB(255, 255, 255),
+	GoldYellow = Color3.fromRGB(255, 220, 50),
 }
 
 return GameConfig

@@ -9,6 +9,7 @@ local DataService = Knit.CreateService { Name = "DataService" }
 local ProfileTemplate = {
 	Wallet = GameConfig.StartingWallet,
 	Vault = GameConfig.StartingVault,
+	TotalEarned = 0, -- Track total money earned from NFTs for achievements
 	UnlockedTitles = { "NO_DATA" },
 	CurrentTitle = "NO_DATA",
 	NftInventory = {},
@@ -56,11 +57,35 @@ function DataService:KnitInit()
 			if player:IsDescendantOf(Players) then
 				Profiles[player] = profile
 				
+				-- Initialize TotalEarned for existing profiles
+				if not profile.Data.TotalEarned then
+					profile.Data.TotalEarned = 0
+				end
+				
 				-- Báo data đã load
 				Knit.GetService("InventoryService"):OnDataLoaded(player, profile.Data)
 				Knit.GetService("AchievementService"):OnDataLoaded(player, profile.Data)
 				Knit.GetService("ShopService"):GenerateDailyShop(player)
 				Knit.GetService("EconomyService"):OnDataLoaded(player, profile.Data)
+				
+				-- Spawn player on home planet
+				task.defer(function()
+					local char = player.Character or player.CharacterAdded:Wait()
+					if char then
+						-- Wait for home planet spawn location
+						local homeSpawn = workspace:WaitForChild("HomeSpawn", 5)
+						if homeSpawn then
+							local rootPart = char:WaitForChild("HumanoidRootPart")
+							rootPart.CFrame = homeSpawn.CFrame + Vector3.new(0, 5, 0)
+							print("🚀 Spawned", player.Name, "on home planet")
+						else
+						-- Fallback: spawn above home planet at safe height
+						local rootPart = char:WaitForChild("HumanoidRootPart")
+						rootPart.CFrame = CFrame.new(0, 3100, 0) -- Y=3100 matches new home planet height + buffer
+							print("⚠️ Fallback spawn for", player.Name)
+						end
+					end
+				end)
 			else
 				profile:EndSession()
 			end

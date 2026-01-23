@@ -314,7 +314,7 @@ function MatchService:StartDealing(seatName)
 		local timeoutId = {}
 		game.TurnTimeout = timeoutId
 		task.spawn(function()
-			self:StartTimer(seatName, 8, function()
+			self:StartTimer(seatName, 10, function()
 				if game.TurnTimeout == timeoutId and firstPlayer and not firstPlayer.HasActed then
 					print("[MATCH] Player", firstPlayer.Player.Name, "timeout - auto STAND")
 					firstPlayer.State = "STAND"
@@ -387,7 +387,7 @@ function MatchService:Hit(player, seatName)
 		local timeoutId = {}
 		game.TurnTimeout = timeoutId
 		task.spawn(function()
-			self:StartTimer(seatName, 8, function()
+			self:StartTimer(seatName, 10, function()
 				if game.TurnTimeout == timeoutId and currentPlayer and not currentPlayer.HasActed then
 					print("[MATCH] Player", currentPlayer.Player.Name, "timeout - auto STAND")
 					currentPlayer.State = "STAND"
@@ -441,11 +441,11 @@ function MatchService:CheckNextTurn(seatName)
 			foundNext = true
 			self:BroadcastGameState(seatName)
 			
-			-- Start 8s timeout for player turn
+			-- Start 10s timeout for player turn
 			local timeoutId = {}
 			game.TurnTimeout = timeoutId
 			task.spawn(function()
-				self:StartTimer(seatName, 8, function()
+				self:StartTimer(seatName, 10, function()
 					-- Auto STAND if player doesn't act in time
 					local currentPlayer = game.Players[game.CurrentPlayerIndex]
 					if game.TurnTimeout == timeoutId and currentPlayer and not currentPlayer.HasActed then

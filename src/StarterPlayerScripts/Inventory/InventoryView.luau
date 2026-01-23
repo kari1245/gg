@@ -42,7 +42,7 @@ function InventoryView.New(scope, props)
 		Name = "UI_Inventory", ResetOnSpawn = false, DisplayOrder = 20,
 		[Fusion.Children] = {
 			CyberButton(scope, {
-				Text = "◢ INV", Size = UDim2.new(0.065, 0, 0.09, 0), Position = UDim2.new(0.015, 0, 0.33, 0),
+				Text = "▦ INV", Size = UDim2.new(0.065, 0, 0.09, 0), Position = UDim2.new(0.015, 0, 0.33, 0),
 				Color = Theme.NeonGreen, OnClick = props.OnToggle
 			}),
 
@@ -68,9 +68,34 @@ function InventoryView.New(scope, props)
 					-- Header
 					scope:New "TextLabel" { 
 						Text = "◢◤ YOUR WALLET ◥◣", 
-						Size = UDim2.new(1, 0, 0.095, 0), BackgroundTransparency = 1, 
+						Size = UDim2.new(0.6, 0, 0.095, 0), BackgroundTransparency = 1, 
 						TextColor3 = Theme.NeonGreen, Font = Enum.Font.Code, TextScaled = true,
 						TextStrokeTransparency = 0.4, TextStrokeColor3 = Theme.NeonCyan,
+						ZIndex = 2
+					},
+					
+					-- Total NFT Value
+					scope:New "TextLabel" { 
+						Text = scope:Computed(function(use)
+							local list = use(props.NftList)
+							local total = 0
+							for _, item in list do
+								total += item.Price or 0
+							end
+							local formatted
+							if total >= 1e10 then
+								if total >= 1e12 then formatted = string.format("%.2fT", total/1e12)
+								elseif total >= 1e9 then formatted = string.format("%.2fB", total/1e9)
+								elseif total >= 1e6 then formatted = string.format("%.2fM", total/1e6)
+								else formatted = string.format("%.2fK", total/1e3) end
+							else
+								formatted = tostring(total):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+							end
+							return "◈ TOTAL: $" .. formatted
+						end),
+						Size = UDim2.new(0.38, 0, 0.095, 0), Position = UDim2.new(0.61, 0, 0, 0), BackgroundTransparency = 1, 
+						TextColor3 = Theme.GoldYellow, Font = Enum.Font.Code, TextScaled = true,
+						TextStrokeTransparency = 0.4, TextStrokeColor3 = Theme.GoldYellow,
 						ZIndex = 2
 					},
 					
@@ -90,6 +115,16 @@ function InventoryView.New(scope, props)
 							},
 							scope:ForValues(props.NftList, function(use, inner, item)
 								local color = GameConfig.NftRarities[item.Rarity].Color
+								local formattedPrice
+								local price = item.Price or 0
+								if price >= 1e10 then
+									if price >= 1e12 then formattedPrice = string.format("%.1fT", price/1e12)
+									elseif price >= 1e9 then formattedPrice = string.format("%.1fB", price/1e9)
+									elseif price >= 1e6 then formattedPrice = string.format("%.1fM", price/1e6)
+									else formattedPrice = string.format("%.1fK", price/1e3) end
+								else
+									formattedPrice = tostring(price):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+								end
 								return inner:New "TextButton" {
 									BackgroundColor3 = Theme.MidBg,
 									BackgroundTransparency = 0.3,
@@ -106,8 +141,14 @@ function InventoryView.New(scope, props)
 										},
 										inner:New "TextLabel" { 
 											Text = "▸ " .. string.sub(item.Hash, 1, 6) .. "...", 
-											Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, 
+											Size = UDim2.new(1, 0, 0.5, 0), BackgroundTransparency = 1, 
 											TextColor3 = color, Font = Enum.Font.Code, TextScaled = true,
+											TextStrokeTransparency = 0.6, ZIndex = 2
+										},
+										inner:New "TextLabel" { 
+											Text = "$" .. formattedPrice, 
+											Size = UDim2.new(1, 0, 0.4, 0), Position = UDim2.new(0, 0, 0.57, 0), BackgroundTransparency = 1, 
+											TextColor3 = Theme.GoldYellow, Font = Enum.Font.Code, TextScaled = true,
 											TextStrokeTransparency = 0.6, ZIndex = 2
 										}
 									}
@@ -182,7 +223,7 @@ function InventoryView.New(scope, props)
 									local item = use(inspectItem)
 									return item and ("◤ " .. item.Rarity:upper() .. " ◥") or "" 
 								end),
-								Size = UDim2.new(1, 0, 0.13, 0), Position = UDim2.fromScale(0, 0.63),
+								Size = UDim2.new(1, 0, 0.12, 0), Position = UDim2.fromScale(0, 0.59),
 								BackgroundTransparency = 1,
 								TextColor3 = scope:Computed(function(use)
 									local item = use(inspectItem)
@@ -192,8 +233,32 @@ function InventoryView.New(scope, props)
 								TextStrokeTransparency = 0.3, ZIndex = 2
 							},
 							
+							-- Price
+							scope:New "TextLabel" {
+								Text = scope:Computed(function(use) 
+									local item = use(inspectItem)
+									if not item then return "" end
+									local price = item.Price or 0
+									local formatted
+									if price >= 1e10 then
+										if price >= 1e12 then formatted = string.format("%.2fT", price/1e12)
+										elseif price >= 1e9 then formatted = string.format("%.2fB", price/1e9)
+										elseif price >= 1e6 then formatted = string.format("%.2fM", price/1e6)
+										else formatted = string.format("%.2fK", price/1e3) end
+									else
+										formatted = tostring(price):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+									end
+									return "◈ VALUE: $" .. formatted
+								end),
+								Size = UDim2.new(1, 0, 0.11, 0), Position = UDim2.fromScale(0, 0.71),
+								BackgroundTransparency = 1,
+								TextColor3 = Theme.GoldYellow,
+								Font = Enum.Font.Code, TextScaled = true,
+								TextStrokeTransparency = 0.4, ZIndex = 2
+							},
+							
 							CyberButton(scope, {
-								Text = "✕ CLOSE", Size = UDim2.new(0.35, 0, 0, 45), Position = UDim2.new(0.325, 0, 0.82, 0),
+							Text = "◆ CLOSE", Size = UDim2.new(0.35, 0, 0, 45), Position = UDim2.new(0.325, 0, 0.82, 0),
 								Color = Theme.GlitchRed,
 								OnClick = function() inspectItem:set(nil) end
 							})

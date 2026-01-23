@@ -9,18 +9,29 @@ local InventoryController = Knit.CreateController { Name = "InventoryController"
 function InventoryController:KnitStart()
 	self.InvService = Knit.GetService("InventoryService")
 	self.SoundController = Knit.GetController("SoundController")
+	self.UIManager = Knit.GetController("UIManagerController")
 	
 	local scope = Fusion.scoped(Fusion)
 	local NftList = scope:Value({}) -- Danh sách NFT
 	local IsOpen = scope:Value(false)
 	
-	-- Sync Data
-	self.InvService.InventoryUpdated:Connect(function(data)
-		NftList:set(data or {})
+	-- Register với UIManager
+	if self.UIManager then
+		self.UIManager:RegisterUI("Inventory", IsOpen)
+	end
+	
+	-- Load initial data first
+	self.InvService:GetData():andThen(function(data)
+		if data then 
+			NftList:set(data)
+			print("📦 Loaded", #data, "NFTs from inventory")
+		end
 	end)
 	
-	self.InvService:GetData():andThen(function(data)
-		if data then NftList:set(data) end
+	-- Then subscribe to updates
+	self.InvService.InventoryUpdated:Connect(function(data)
+		NftList:set(data or {})
+		print("📦 Inventory updated:", #(data or {}), "NFTs")
 	end)
 	
 	-- Render

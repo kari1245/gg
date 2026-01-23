@@ -95,6 +95,14 @@ function ShopService.Client:BuyNft(player, hash)
 		
 		server.Client.ShopUpdated:Fire(player, shopItems)
 		
+		-- Update leaderboard
+		task.defer(function()
+			local LeaderboardService = Knit.GetService("LeaderboardService")
+			if LeaderboardService then
+				LeaderboardService:RefreshPlayer(player)
+			end
+		end)
+		
 		print("✅ Buy Success!")
 		return true, "Success"
 	else

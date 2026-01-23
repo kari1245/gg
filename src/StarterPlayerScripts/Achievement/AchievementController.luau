@@ -18,6 +18,12 @@ end
 function AchievementController:KnitStart()
 	self.AchService = Knit.GetService("AchievementService")
 	self.SoundController = Knit.GetController("SoundController")
+	self.UIManager = Knit.GetController("UIManagerController")
+	
+	-- Register với UIManager
+	if self.UIManager then
+		self.UIManager:RegisterUI("Achievement", self.isOpen)
+	end
 
 	self.AchService.AchievementUpdated:Connect(function(list, current)
 		self.UnlockedTitles:set(list or {})

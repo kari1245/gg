@@ -62,27 +62,39 @@ local function CyberButton(scope, props)
 end
 
 -- [[ HÀM RENDER ITEM ]]
-local function RenderAchievementItem(scope, title, props)
+local function RenderAchievementItem(scope, achData, props)
+	local title = achData.Title
+	local isUnlocked = achData.IsUnlocked
 	local isEquipped = scope:Computed(function(use) 
 		return use(props.CurrentTitle) == title 
 	end)
+	
+	-- Use achievement's custom color
+	local achColor = achData.Color or Theme.NeonPurple
 
 	local stateColor = scope:Computed(function(use)
-		return use(isEquipped) and Theme.NeonGreen or Theme.NeonPurple
+		if not isUnlocked then return Color3.fromRGB(80, 80, 80) end -- Locked = gray
+		return use(isEquipped) and Theme.NeonGreen or achColor
 	end)
 
 	local btnColor = scope:Computed(function(use)
-		return use(isEquipped) and Theme.NeonGreen or GameConfig.Colors.Gold
+		if not isUnlocked then return Color3.fromRGB(100, 100, 100) end
+		return use(isEquipped) and Theme.GlitchRed or achColor
 	end)
 
 	local btnText = scope:Computed(function(use)
-		return use(isEquipped) and "▼ ACTIVE" or "▲ EQUIP"
+		if not isUnlocked then return "○ LOCKED" end
+		return use(isEquipped) and "▼ UNEQUIP" or "▲ EQUIP"
+	end)
+	
+	local btnDisabled = scope:Computed(function(use)
+		return not isUnlocked
 	end)
 
 	return scope:New "Frame" {
-		Size = UDim2.new(1, 0, 0, 60), 
+		Size = UDim2.new(1, 0, 0, 90), 
 		BackgroundColor3 = Theme.MidBg,
-		BackgroundTransparency = 0.3,
+		BackgroundTransparency = isUnlocked and 0.3 or 0.6,
 		[Fusion.Children] = {
 			scope:New "UICorner" { CornerRadius = UDim.new(0, 10) },
 
@@ -90,7 +102,7 @@ local function RenderAchievementItem(scope, title, props)
 			scope:New "UIStroke" { 
 				Color = stateColor, 
 				Thickness = scope:Computed(function(use) return use(isEquipped) and 3 or 1.5 end),
-				Transparency = 0
+				Transparency = isUnlocked and 0 or 0.5
 			},
 			
 			-- Glow khi equipped
@@ -99,22 +111,65 @@ local function RenderAchievementItem(scope, title, props)
 				Size = UDim2.fromScale(1.05, 1.05), Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1,
 				Image = "rbxassetid://5028857084",
-				ImageColor3 = Theme.NeonGreen,
+				ImageColor3 = achColor,
 				ImageTransparency = 0.6, ZIndex = 0
+			},
+			
+			-- Icon
+			scope:New "TextLabel" {
+				Text = isUnlocked and (achData.Icon or "◆") or "○",
+				Size = UDim2.fromOffset(40, 40),
+				Position = UDim2.fromOffset(10, 10),
+				BackgroundTransparency = 1,
+				TextColor3 = isUnlocked and achColor or Color3.fromRGB(100, 100, 100),
+				Font = Enum.Font.Code,
+				TextSize = 32,
+				ZIndex = 2
 			},
 
 			-- Tên Title
 			scope:New "TextLabel" {
-				Text = "► " .. title, 
-				Size = UDim2.fromScale(0.58, 0.6), 
+				Text = title, 
+				Size = UDim2.new(0.5, -60, 0, 24), 
 				BackgroundTransparency = 1, 
-				Position = UDim2.new(0.03, 0, 0.2, 0),
+				Position = UDim2.fromOffset(60, 8),
 				TextColor3 = scope:Computed(function(use) 
-					return use(isEquipped) and Theme.NeonGreen or Color3.fromRGB(200,200,200) 
+					if not isUnlocked then return Color3.fromRGB(120, 120, 120) end
+					return use(isEquipped) and Theme.NeonGreen or achColor
 				end), 
-				Font = Enum.Font.Code, TextScaled = true, 
-				TextXAlignment = "Left", TextTruncate = "AtEnd",
-				TextStrokeTransparency = 0.7,
+				Font = Enum.Font.Code, 
+				TextSize = 16,
+				TextScaled = true,
+				TextXAlignment = "Left", 
+				TextTruncate = "AtEnd",
+				TextStrokeTransparency = 0.5,
+				ZIndex = 2
+			},
+			
+			-- Description (Điều kiện)
+			scope:New "TextLabel" {
+				Text = "📋 " .. achData.Desc,
+				Size = UDim2.new(0.5, -60, 0, 18),
+				Position = UDim2.fromOffset(60, 36),
+				BackgroundTransparency = 1,
+				TextColor3 = isUnlocked and Color3.fromRGB(180, 180, 180) or Color3.fromRGB(100, 100, 100),
+				Font = Enum.Font.Code,
+				TextSize = 12,
+				TextXAlignment = "Left",
+				TextTruncate = "AtEnd",
+				ZIndex = 2
+			},
+			
+			-- Requirement Value
+			scope:New "TextLabel" {
+				Text = string.format("🎯 %s: %s", achData.Type, tostring(achData.Val)),
+				Size = UDim2.new(0.5, -60, 0, 18),
+				Position = UDim2.fromOffset(60, 58),
+				BackgroundTransparency = 1,
+				TextColor3 = isUnlocked and Color3.fromRGB(150, 255, 150) or Color3.fromRGB(80, 100, 80),
+				Font = Enum.Font.Code,
+				TextSize = 11,
+				TextXAlignment = "Left",
 				ZIndex = 2
 			},
 
@@ -122,37 +177,67 @@ local function RenderAchievementItem(scope, title, props)
 			CyberButton(scope, {
 				Text = btnText,
 				Color = btnColor,
-				Size = UDim2.fromOffset(95, 38), 
+				Size = UDim2.fromOffset(100, 40), 
 				Position = UDim2.new(1, -12, 0.5, 0), 
 				AnchorPoint = Vector2.new(1, 0.5),
-				Disabled = isEquipped,
+				Disabled = btnDisabled,
 				OnClick = function() 
 					local current = Fusion.peek(props.CurrentTitle)
-					if current ~= title then props.OnEquip(title) end 
+					if not isUnlocked then return end -- Can't click locked achievements
+					-- If already equipped, unequip it
+					if current == title then 
+						props.OnEquip("") -- Empty string to unequip
+					else
+						props.OnEquip(title)
+					end
 				end
 			})
 		}
 	}
 end
 
-local function GetAchType(title)
+local function GetAchData(title)
 	for _, ach in ipairs(GameConfig.Achievements) do
-		if ach.Title == title then return ach.Type end
+		if ach.Title == title then return ach end
 	end
-	return "Other"
+	return nil
 end
 
 function AchievementView.New(scope, props)
 	local AchievementList = scope:Computed(function(use)
 		local list = {}
-		-- [FIX] Thêm NO_DATA vào danh sách hiển thị nếu chưa có
-		local hasNoData = false
+		local unlockedSet = {}
+		
+		-- Build unlocked set for fast lookup
 		for _, title in ipairs(use(props.UnlockedList)) do
-			if title == "NO_DATA" then hasNoData = true end
-			if GetAchType(title) == "Wallet" then table.insert(list, title) end
+			if title ~= "NO_DATA" then
+				unlockedSet[title] = true
+			end
 		end
-		-- Nếu người chơi có NO_DATA (từ DataService), ta cho nó hiện ở cột này
-		if hasNoData then table.insert(list, 1, "NO_DATA") end
+		
+		-- Show ALL achievements with unlock status
+		for _, ach in ipairs(GameConfig.Achievements) do
+			local achCopy = {
+				ID = ach.ID,
+				Type = ach.Type,
+				Val = ach.Val,
+				Title = ach.Title,
+				Desc = ach.Desc,
+				Color = ach.Color,
+				Icon = ach.Icon,
+				IsUnlocked = unlockedSet[ach.Title] or false
+			}
+			table.insert(list, achCopy)
+		end
+		
+		-- Sort: unlocked first, then by ID
+		table.sort(list, function(a, b)
+			if a.IsUnlocked ~= b.IsUnlocked then
+				return a.IsUnlocked
+			end
+			return a.ID < b.ID
+		end)
+		
 		return list
 	end)
 
@@ -160,10 +245,8 @@ function AchievementView.New(scope, props)
 		Name = "UI_Achievement", ResetOnSpawn = false, DisplayOrder = 20,
 		[Fusion.Children] = {
 			CyberButton(scope, {
-				Text = "◢ XP", Size = UDim2.new(0.065, 0, 0.09, 0), Position = UDim2.new(0.015, 0, 0.13, 0),
-				Color = Theme.NeonPurple, OnClick = props.OnToggle
+					Text = "◆ RNK", Size = UDim2.new(0.065, 0, 0.09, 0), Position = UDim2.new(0.015, 0, 0.13, 0),				Color = Theme.NeonPurple, OnClick = props.OnToggle
 			}),
-
 			scope:New "Frame" {
 				Visible = scope:Computed(function(use) return use(props.IsOpen) end),
 				Size = UDim2.fromScale(0.75, 0.7), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5),
@@ -237,8 +320,8 @@ function AchievementView.New(scope, props)
 										ScrollBarThickness = 6, ScrollBarImageColor3 = Theme.NeonPurple,
 										[Fusion.Children] = {
 											scope:New "UIListLayout" { Padding = UDim.new(0, 10) },
-											scope:ForValues(AchievementList, function(use, inner, title)
-												return RenderAchievementItem(inner, title, props)
+											scope:ForValues(AchievementList, function(use, inner, achData)
+												return RenderAchievementItem(inner, achData, props)
 											end)
 										}
 									}

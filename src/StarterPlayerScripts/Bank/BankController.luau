@@ -9,10 +9,16 @@ local BankController = Knit.CreateController { Name = "BankController" }
 function BankController:KnitStart()
 	self.EcoService = Knit.GetService("EconomyService")
 	self.SoundController = Knit.GetController("SoundController")
+	self.UIManager = Knit.GetController("UIManagerController")
 
 	local scope = Fusion.scoped(Fusion)
 	local IsOpen = scope:Value(false)
 	local AmountInput = scope:Value("")
+	
+	-- Register với UIManager
+	if self.UIManager then
+		self.UIManager:RegisterUI("Bank", IsOpen)
+	end
 
 	-- Toggle Action (Để các controller khác có thể gọi nếu cần)
 	function self:Toggle()

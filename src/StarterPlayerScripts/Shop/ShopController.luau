@@ -9,10 +9,16 @@ local ShopController = Knit.CreateController { Name = "ShopController" }
 function ShopController:KnitStart()
 	self.ShopService = Knit.GetService("ShopService")
 	self.SoundController = Knit.GetController("SoundController")
+	self.UIManager = Knit.GetController("UIManagerController")
 	
 	local scope = Fusion.scoped(Fusion)
 	local IsOpen = scope:Value(false)
 	local DailyItems = scope:Value({})
+	
+	-- Register với UIManager
+	if self.UIManager then
+		self.UIManager:RegisterUI("Shop", IsOpen)
+	end
 	
 	-- Lấy dữ liệu shop
 	self.ShopService:GetShopData():andThen(function(items)

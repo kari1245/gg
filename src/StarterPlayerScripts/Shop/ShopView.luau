@@ -79,7 +79,7 @@ function ShopView.New(scope, props)
 		Name = "UI_Shop", ResetOnSpawn = false, DisplayOrder = 20,
 		[Fusion.Children] = {
 			CyberButton(scope, {
-				Text = "◢ NFT", Size = UDim2.new(0.065, 0, 0.09, 0), Position = UDim2.new(0.015, 0, 0.23, 0),
+				Text = "■ SHP", Size = UDim2.new(0.065, 0, 0.09, 0), Position = UDim2.new(0.015, 0, 0.23, 0),
 				Color = Theme.NeonCyan, OnClick = props.OnToggle
 			}),
 
@@ -269,7 +269,7 @@ function ShopView.New(scope, props)
 							}),
 							
 							CyberButton(scope, {
-								Text = "✕ CLOSE", Size = UDim2.new(0.3, 0, 0, 35), Position = UDim2.new(0.35, 0, 0.9, 0),
+							Text = "◆ CLOSE", Size = UDim2.new(0.3, 0, 0, 35), Position = UDim2.new(0.35, 0, 0.9, 0),
 								Color = Theme.GlitchRed,
 								OnClick = function() inspectItem:set(nil) end
 							})

@@ -71,6 +71,8 @@ function AchievementService:Check(player)
 	local profile = self.DataService:GetProfile(player)
 	if not profile then return end
 	local data = profile.Data
+	
+	print("🔍 [Achievement] Checking for player", player.Name, "- Wallet:", data.Wallet)
 
 	local changed = false
 	for _, ach in ipairs(GameConfig.Achievements) do
@@ -80,8 +82,8 @@ function AchievementService:Check(player)
 		end
 
 		if not has then
-			local passed = false
-			if ach.Type == "Wallet" and data.Wallet >= ach.Val then passed = true end
+			-- Check Wallet balance
+			local passed = data.Wallet >= ach.Val
 
 			if passed then
 				table.insert(data.UnlockedTitles, ach.Title)
@@ -101,11 +103,11 @@ function AchievementService.Client:EquipTitle(player, title)
 	if not profile then return false end
 	local data = profile.Data
 
-	-- [FIX] Cho phép equip NO_DATA luôn thành công
-	if title == "NO_DATA" then
-		data.CurrentTitle = title
-		UpdateOverhead(player, title)
-		self.Server.Client.AchievementUpdated:Fire(player, data.UnlockedTitles, title)
+	-- Allow unequip by passing empty string or NO_DATA
+	if title == "" or title == "NO_DATA" then
+		data.CurrentTitle = "NO_DATA"
+		UpdateOverhead(player, "NO_DATA")
+		self.Server.Client.AchievementUpdated:Fire(player, data.UnlockedTitles, "NO_DATA")
 		return true
 	end
 

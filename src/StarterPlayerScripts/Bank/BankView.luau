@@ -50,7 +50,7 @@ function BankView.New(scope, props)
 		[Fusion.Children] = {
 			-- Nút Sidebar
 			CyberButton(scope, {
-					Text = "◢ VLT", Size = UDim2.fromScale(0.065, 0.09),
+					Text = "◆ VLT", Size = UDim2.fromScale(0.065, 0.09),
 					Position = UDim2.fromScale(0.015, 0.43),
 					Color = GameConfig.Colors.Gold,
 					OnClick = props.OnToggle

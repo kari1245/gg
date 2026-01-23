@@ -14,6 +14,14 @@ end
 
 function EconomyService:OnDataLoaded(player, data)
 	self.Client.MoneyUpdated:Fire(player, data.Wallet, data.Vault)
+	
+	-- Trigger leaderboard update
+	task.defer(function()
+		local LeaderboardService = Knit.GetService("LeaderboardService")
+		if LeaderboardService then
+			LeaderboardService:RefreshPlayer(player)
+		end
+	end)
 end
 
 function EconomyService:ModifyWallet(player, amount)
@@ -21,6 +29,15 @@ function EconomyService:ModifyWallet(player, amount)
 	if not profile then return false end
 	profile.Data.Wallet += amount
 	self.Client.MoneyUpdated:Fire(player, profile.Data.Wallet, profile.Data.Vault)
+	
+	-- Refresh leaderboard
+	task.defer(function()
+		local LeaderboardService = Knit.GetService("LeaderboardService")
+		if LeaderboardService then
+			LeaderboardService:RefreshPlayer(player)
+		end
+	end)
+	
 	return true
 end
 
@@ -29,6 +46,15 @@ function EconomyService:ModifyVault(player, amount)
 	if not profile then return false end
 	profile.Data.Vault += amount
 	self.Client.MoneyUpdated:Fire(player, profile.Data.Wallet, profile.Data.Vault)
+	
+	-- Refresh leaderboard
+	task.defer(function()
+		local LeaderboardService = Knit.GetService("LeaderboardService")
+		if LeaderboardService then
+			LeaderboardService:RefreshPlayer(player)
+		end
+	end)
+	
 	return true
 end
 
@@ -46,6 +72,15 @@ function EconomyService:Transfer(player, action, amount)
 			data.Wallet -= amount
 			data.Vault += amount
 			self.Client.MoneyUpdated:Fire(player, data.Wallet, data.Vault)
+			
+			-- Refresh leaderboard
+			task.defer(function()
+				local LeaderboardService = Knit.GetService("LeaderboardService")
+				if LeaderboardService then
+					LeaderboardService:RefreshPlayer(player)
+				end
+			end)
+			
 			return true
 		end
 	elseif action == "WITHDRAW" then
@@ -53,6 +88,15 @@ function EconomyService:Transfer(player, action, amount)
 			data.Vault -= amount
 			data.Wallet += amount
 			self.Client.MoneyUpdated:Fire(player, data.Wallet, data.Vault)
+			
+			-- Refresh leaderboard
+			task.defer(function()
+				local LeaderboardService = Knit.GetService("LeaderboardService")
+				if LeaderboardService then
+					LeaderboardService:RefreshPlayer(player)
+				end
+			end)
+			
 			return true
 		end
 	end

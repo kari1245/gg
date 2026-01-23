@@ -26,8 +26,12 @@ function InventoryService:AddNft(player, nftData)
 end
 
 function InventoryService.Client:GetData(player)
-	local profile = self.Server.DataService:GetProfile(player)
-	if profile then return profile.Data.NftInventory end
+	local profile = self.Server.DataService:WaitForProfile(player) -- Dùng WaitForProfile thay vì GetProfile
+	if profile then 
+		print("📦 GetData for", player.Name, "returned", #profile.Data.NftInventory, "NFTs")
+		return profile.Data.NftInventory 
+	end
+	print("⚠️ GetData for", player.Name, "- No profile found")
 	return {}
 end
 
