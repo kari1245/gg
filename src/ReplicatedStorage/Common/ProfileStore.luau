@@ -967,7 +967,7 @@ end
 
 --]]
 
-export type JSONAcceptable = { JSONAcceptable } | { [string]: JSONAcceptable } | number | string | boolean | buffer
+export type JSONAcceptable = { JSONAcceptable } | { [string]: JSONAcceptable } | number | string | boolean
 
 export type Profile<T> = {
 	Data: T & JSONAcceptable,
