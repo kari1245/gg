@@ -54,8 +54,6 @@ function InventoryView.New(scope, props)
 				BackgroundTransparency = 0.1,
 				[Fusion.Children] = {
 					scope:New "UICorner" { CornerRadius = UDim.new(0, 20) },
-					scope:New "UIAspectRatioConstraint" { AspectRatio = 0.87 },
-					scope:New "UIStroke" { Thickness = 3.5, Color = Theme.NeonGreen, Transparency = 0 },
 
 					-- Grid background
 					scope:New "ImageLabel" {
@@ -258,7 +256,7 @@ function InventoryView.New(scope, props)
 							},
 							
 							CyberButton(scope, {
-							Text = "◆ CLOSE", Size = UDim2.new(0.35, 0, 0, 45), Position = UDim2.new(0.325, 0, 0.82, 0),
+							Text = "◆ CLOSE", Size = UDim2.fromScale(0.35, 0.1), Position = UDim2.fromScale(0.325, 0.82),
 								Color = Theme.GlitchRed,
 								OnClick = function() inspectItem:set(nil) end
 							})

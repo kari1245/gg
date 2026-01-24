@@ -46,6 +46,16 @@ function SpaceFlightController:KnitStart()
 	local glow
 	local textLabel
 	
+	-- Mobile touch controls
+	local touchControls = {
+		leftStick = nil, -- For WASD movement
+		rightStick = nil, -- For Up/Down
+		isLeftTouching = false,
+		isRightTouching = false,
+		leftTouchPos = Vector2.zero,
+		rightTouchPos = Vector2.zero
+	}
+	
 	-- Toggle flight mode
 	local function ToggleFlight()
 		isFlying = not isFlying
@@ -149,10 +159,101 @@ function SpaceFlightController:KnitStart()
 		end
 	end)
 	
+	-- Mobile touch input handling
+	local function ProcessTouch(touch, touchPos)
+		if not isFlying then return end
+		
+		-- Left side = movement joystick (WASD)
+		if touchPos.X < workspace.CurrentCamera.ViewportSize.X / 2 then
+			touchControls.isLeftTouching = true
+			touchControls.leftTouchPos = touchPos
+		-- Right side = up/down + boost
+		else
+			touchControls.isRightTouching = true
+			touchControls.rightTouchPos = touchPos
+		end
+	end
+	
+	UserInputService.TouchStarted:Connect(function(touch, processed)
+		if processed then return end
+		ProcessTouch(touch, touch.Position)
+	end)
+	
+	UserInputService.TouchMoved:Connect(function(touch, processed)
+		if processed then return end
+		ProcessTouch(touch, touch.Position)
+	end)
+	
+	UserInputService.TouchEnded:Connect(function(touch, processed)
+		-- Determine which side was released
+		if touch.Position.X < workspace.CurrentCamera.ViewportSize.X / 2 then
+			touchControls.isLeftTouching = false
+			-- Reset movement inputs
+			inputs.Forward = false
+			inputs.Backward = false
+			inputs.Left = false
+			inputs.Right = false
+		else
+			touchControls.isRightTouching = false
+			inputs.Up = false
+			inputs.Down = false
+			inputs.Boost = false
+		end
+	end)
+	
+	-- Process touch controls every frame
+	local function UpdateTouchControls()
+		if not isFlying then return end
+		
+		local viewport = workspace.CurrentCamera.ViewportSize
+		
+		-- Left joystick - WASD movement
+		if touchControls.isLeftTouching then
+			local center = Vector2.new(viewport.X * 0.15, viewport.Y * 0.75)
+			local delta = touchControls.leftTouchPos - center
+			local deadzone = 30
+			
+			-- Reset all directions first
+			inputs.Forward = false
+			inputs.Backward = false
+			inputs.Left = false
+			inputs.Right = false
+			
+			-- Apply directions based on delta
+			if delta.Magnitude > deadzone then
+				local normalized = delta.Unit
+				if normalized.Y < -0.4 then inputs.Forward = true end
+				if normalized.Y > 0.4 then inputs.Backward = true end
+				if normalized.X < -0.4 then inputs.Left = true end
+				if normalized.X > 0.4 then inputs.Right = true end
+			end
+		end
+		
+		-- Right joystick - Up/Down + Boost
+		if touchControls.isRightTouching then
+			local center = Vector2.new(viewport.X * 0.85, viewport.Y * 0.75)
+			local delta = touchControls.rightTouchPos - center
+			local deadzone = 30
+			
+			inputs.Up = false
+			inputs.Down = false
+			inputs.Boost = false
+			
+			if delta.Magnitude > deadzone then
+				if delta.Y < -40 then inputs.Up = true end
+				if delta.Y > 40 then inputs.Down = true end
+				if delta.Magnitude > 80 then inputs.Boost = true end
+			end
+		end
+	end
+	
 	-- Flight physics loop
 	RunService.RenderStepped:Connect(function(dt)
 		if not isFlying then return end
 		if not rootPart or not rootPart.Parent then return end
+		
+		-- Update touch controls first
+		UpdateTouchControls()
 		
 		-- Calculate target velocity from inputs
 		local inputVector = Vector3.zero
@@ -198,8 +299,8 @@ function SpaceFlightController:KnitStart()
 	-- Home button (above fly button)
 	local homeButton = Instance.new("TextButton")
 	homeButton.Name = "HomeButton"
-	homeButton.Size = UDim2.fromOffset(120, 60)
-	homeButton.Position = UDim2.new(1, -140, 1, -150)
+	homeButton.Size = UDim2.fromScale(0.12, 0.09) -- Scale-based like sidebar
+	homeButton.Position = UDim2.fromScale(0.875, 0.73) -- 73% from top
 	homeButton.AnchorPoint = Vector2.new(0, 0)
 	homeButton.BackgroundColor3 = Color3.fromRGB(5, 10, 15) -- DarkBg
 	homeButton.BackgroundTransparency = 0.2
@@ -252,8 +353,8 @@ function SpaceFlightController:KnitStart()
 	
 	flightButton = Instance.new("TextButton")
 	flightButton.Name = "FlightButton"
-	flightButton.Size = UDim2.fromOffset(120, 60)
-	flightButton.Position = UDim2.new(1, -140, 1, -80)
+	flightButton.Size = UDim2.fromScale(0.12, 0.09) -- Scale-based like sidebar
+	flightButton.Position = UDim2.fromScale(0.875, 0.83) -- 83% from top - 0.01 gap (0.73+0.09+0.01)
 	flightButton.AnchorPoint = Vector2.new(0, 0)
 	flightButton.BackgroundColor3 = Color3.fromRGB(5, 10, 15) -- DarkBg
 	flightButton.BackgroundTransparency = 0.2
@@ -297,11 +398,6 @@ function SpaceFlightController:KnitStart()
 	textLabel.TextStrokeTransparency = 0.5
 	textLabel.ZIndex = 2
 	textLabel.Parent = flightButton
-	glow.Image = "rbxassetid://5028857084"
-	glow.ImageColor3 = Color3.fromRGB(0, 255, 255) -- NeonCyan
-	glow.ImageTransparency = 0.65
-	glow.ZIndex = 0
-	glow.Parent = flightButton
 	
 	-- Button click handler
 	flightButton.MouseButton1Click:Connect(function()

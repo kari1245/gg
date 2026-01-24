@@ -9,7 +9,7 @@ local MiniGameController = Knit.CreateController { Name = "MiniGameController" }
 function MiniGameController:KnitStart()
 	self.SoundController = Knit.GetController("SoundController")
 	self.UIManager = Knit.GetController("UIManagerController")
-	self.MatchController = Knit.GetController("MatchController")
+	self.BlackjackController = Knit.GetController("BlackjackController")
 	
 	local scope = Fusion.scoped(Fusion)
 	local IsOpen = scope:Value(false)
@@ -35,9 +35,9 @@ function MiniGameController:KnitStart()
 		
 		OnPlayBlackjack = function()
 			if self.SoundController then self.SoundController:Play("UI_Click") end
-			-- Trigger match controller to join game
-			if self.MatchController and self.MatchController.JoinGameDirectly then
-				self.MatchController:JoinGameDirectly()
+			-- Join blackjack game
+			if self.BlackjackController then
+				self.BlackjackController:Join()
 			end
 			IsOpen:set(false)
 		end

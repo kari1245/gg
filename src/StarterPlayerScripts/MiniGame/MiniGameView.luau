@@ -158,7 +158,7 @@ function MiniGameView.New(scope, props)
 	-- Main panel
 	local panel = scope:New "Frame" {
 		Name = "MiniGamePanel",
-		Size = UDim2.fromScale(0.85, 0.75),
+		Size = UDim2.fromScale(0.75, 0.75),
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundColor3 = Theme.DarkBg,
@@ -173,7 +173,6 @@ function MiniGameView.New(scope, props)
 				Thickness = 3,
 				Transparency = 0
 			},
-			scope:New "UIAspectRatioConstraint" { AspectRatio = 1.5 },
 			
 			-- Glow border
 			scope:New "ImageLabel" {

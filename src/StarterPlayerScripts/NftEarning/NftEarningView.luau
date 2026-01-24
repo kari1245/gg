@@ -139,14 +139,14 @@ function NftEarningView.New(scope, props)
 			-- Main Panel
 			scope:New "Frame" {
 				Visible = scope:Computed(function(use) return use(props.IsOpen) end),
-				Size = UDim2.fromScale(0.9, 0.8),
+			Size = UDim2.fromScale(0.75, 0.8),
 				Position = UDim2.fromScale(0.5, 0.5),
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = Theme.DarkBg,
 				BackgroundTransparency = 0.1,
 
 				[Fusion.Children] = {
-					scope:New "UIAspectRatioConstraint" { AspectRatio = 1.5 },
+
 					scope:New "UICorner" { CornerRadius = UDim.new(0, 20) },
 					scope:New "UIStroke" {
 						Thickness = 3.5,

@@ -58,7 +58,7 @@ function BankView.New(scope, props)
 
 				scope:New "Frame" {
 				Visible = scope:Computed(function(use) return use(props.IsOpen) end),
-				Size = UDim2.fromScale(0.85, 0.6), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.fromScale(0.75, 0.6), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5),
 				BackgroundColor3 = Theme.DarkBg,
 				BackgroundTransparency = 0.1,
 

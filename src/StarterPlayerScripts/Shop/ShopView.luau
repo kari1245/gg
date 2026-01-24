@@ -91,9 +91,7 @@ function ShopView.New(scope, props)
 				BackgroundTransparency = 0.1,
 				[Fusion.Children] = {
 					scope:New "UICorner" { CornerRadius = UDim.new(0, 20) },
-					scope:New "UIAspectRatioConstraint" { AspectRatio = 1.0 },
-					scope:New "UIStroke" { Thickness = 3, Color = Theme.NeonCyan, Transparency = 0 },
-					
+
 					-- Grid pattern background
 					scope:New "ImageLabel" {
 						Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, ZIndex = 0,
@@ -182,7 +180,7 @@ function ShopView.New(scope, props)
 						BackgroundTransparency = 0.1,
 						[Fusion.Children] = {
 							scope:New "UICorner" { CornerRadius = UDim.new(0, 16) },
-							scope:New "UIAspectRatioConstraint" { AspectRatio = 1.3 },
+
 							scope:New "UIStroke" { 
 								Color = scope:Computed(function(use)
 									local item = use(inspectItem)
@@ -256,7 +254,7 @@ function ShopView.New(scope, props)
 									local item = use(inspectItem)
 									return item and (item.Sold and "▼ SOLD" or "▲ BUY ($"..item.Price..")") or ""
 								end),
-								Size = UDim2.new(0.5, 0, 0, 55), Position = UDim2.new(0.25, 0, 0.72, 0),
+							Size = UDim2.fromScale(0.5, 0.12), Position = UDim2.fromScale(0.25, 0.7),
 								Color = Theme.NeonGreen,
 								Disabled = scope:Computed(function(use) local item = use(inspectItem); return item and item.Sold end),
 								OnClick = function() 
@@ -269,7 +267,7 @@ function ShopView.New(scope, props)
 							}),
 							
 							CyberButton(scope, {
-							Text = "◆ CLOSE", Size = UDim2.new(0.3, 0, 0, 35), Position = UDim2.new(0.35, 0, 0.9, 0),
+								Text = "◆ CLOSE", Size = UDim2.fromScale(0.3, 0.08), Position = UDim2.fromScale(0.35, 0.88),
 								Color = Theme.GlitchRed,
 								OnClick = function() inspectItem:set(nil) end
 							})

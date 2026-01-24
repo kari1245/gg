@@ -34,15 +34,16 @@ function EconomyView.New(scope, props)
 		[Fusion.Children] = {
 			scope:New "Frame" {
 				Name = "MoneyCard",
-				Size = UDim2.fromOffset(160, 85),
-				Position = UDim2.new(0, 12, 1, -12),
-				AnchorPoint = Vector2.new(0, 1),
-				BackgroundColor3 = Color3.fromRGB(8, 12, 18),
-				BackgroundTransparency = 0.1,
-				BorderSizePixel = 0,
+			Size = UDim2.fromScale(0.2, 0.15), -- Increased size: 20% width, 15% height
+			Position = UDim2.fromScale(0.01, 0.84), -- Adjusted position for larger size
+			AnchorPoint = Vector2.new(0, 0),
+			BackgroundColor3 = Color3.fromRGB(8, 12, 18),
+			BackgroundTransparency = 0.1,
+			BorderSizePixel = 0,
 
-				[Fusion.Children] = {
-					scope:New "UICorner" { CornerRadius = UDim.new(0, 12) },
+			[Fusion.Children] = {
+				scope:New "UICorner" { CornerRadius = UDim.new(0, 12) },
+				scope:New "UIAspectRatioConstraint" { AspectRatio = 1.88 }, -- 160/85 = 1.88
 					scope:New "UIStroke" {
 						Thickness = 1.5,
 						Color = Theme.NeonCyan,
@@ -64,18 +65,18 @@ function EconomyView.New(scope, props)
 					
 					-- Wallet
 					scope:New "Frame" {
-						Size = UDim2.new(1, 0, 0, 30),
+						Size = UDim2.fromScale(1, 0.45), -- Scale-based height
 						BackgroundTransparency = 1,
 						LayoutOrder = 1,
 						[Fusion.Children] = {
 							scope:New "TextLabel" {
 								Text = "▸ WALLET",
-								Size = UDim2.new(1, 0, 0, 12),
-								Position = UDim2.fromOffset(0, 0),
+								Size = UDim2.fromScale(1, 0.35), -- Scale-based
+								Position = UDim2.fromScale(0, 0),
 								BackgroundTransparency = 1,
 								TextColor3 = Color3.fromRGB(120, 200, 255),
 								Font = Enum.Font.Code,
-								TextSize = 9,
+								TextScaled = true, -- Auto-scale text
 								TextXAlignment = Enum.TextXAlignment.Left,
 								TextTransparency = 0.4
 							},
@@ -83,12 +84,12 @@ function EconomyView.New(scope, props)
 								Text = scope:Computed(function(use) 
 									return "$" .. FormatMoney(use(props.Wallet) or 0) 
 								end),
-								Size = UDim2.new(1, 0, 0, 16),
-								Position = UDim2.fromOffset(0, 14),
+								Size = UDim2.fromScale(1, 0.55), -- Scale-based
+								Position = UDim2.fromScale(0, 0.45),
 								BackgroundTransparency = 1,
 								TextColor3 = Theme.NeonCyan,
 								Font = Enum.Font.GothamBold,
-								TextSize = 15,
+								TextScaled = true, -- Auto-scale text
 								TextXAlignment = Enum.TextXAlignment.Left,
 								TextStrokeTransparency = 0.7
 							}
@@ -97,18 +98,18 @@ function EconomyView.New(scope, props)
 					
 					-- Vault
 					scope:New "Frame" {
-						Size = UDim2.new(1, 0, 0, 30),
+						Size = UDim2.fromScale(1, 0.45), -- Scale-based height
 						BackgroundTransparency = 1,
 						LayoutOrder = 2,
 						[Fusion.Children] = {
 							scope:New "TextLabel" {
 								Text = "▸ VAULT",
-								Size = UDim2.new(1, 0, 0, 12),
-								Position = UDim2.fromOffset(0, 0),
+								Size = UDim2.fromScale(1, 0.35), -- Scale-based
+								Position = UDim2.fromScale(0, 0),
 								BackgroundTransparency = 1,
 								TextColor3 = Color3.fromRGB(255, 120, 200),
 								Font = Enum.Font.Code,
-								TextSize = 9,
+								TextScaled = true, -- Auto-scale text
 								TextXAlignment = Enum.TextXAlignment.Left,
 								TextTransparency = 0.4
 							},
@@ -116,12 +117,12 @@ function EconomyView.New(scope, props)
 								Text = scope:Computed(function(use) 
 									return "$" .. FormatMoney(use(props.Vault) or 0) 
 								end),
-								Size = UDim2.new(1, 0, 0, 16),
-								Position = UDim2.fromOffset(0, 14),
+								Size = UDim2.fromScale(1, 0.55), -- Scale-based
+								Position = UDim2.fromScale(0, 0.45),
 								BackgroundTransparency = 1,
 								TextColor3 = Theme.NeonPink,
 								Font = Enum.Font.GothamBold,
-								TextSize = 15,
+								TextScaled = true, -- Auto-scale text
 								TextXAlignment = Enum.TextXAlignment.Left,
 								TextStrokeTransparency = 0.7
 							}

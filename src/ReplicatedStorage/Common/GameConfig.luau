@@ -52,10 +52,7 @@ GameConfig.NftEarning = {
 -- [[ 6. BLACKJACK ]]
 GameConfig.Blackjack = { 
 	MinBet = 50, 
-	MaxBet = 50000,
-	MaxPlayers = 3, -- Tối đa 3 người chơi + 1 AI dealer
-	LobbyWaitTime = 5, -- Đợi 5s trong lobby trước khi bắt đầu
-	GameEndWaitTime = 5 -- Đợi 5s sau khi kết thúc game
+	MaxBet = 50000
 }
 
 GameConfig.Colors = { Green = Color3.fromRGB(0, 255, 100), Gold = Color3.fromRGB(255, 200, 0) }

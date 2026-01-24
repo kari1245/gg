@@ -92,7 +92,7 @@ local function RenderAchievementItem(scope, achData, props)
 	end)
 
 	return scope:New "Frame" {
-		Size = UDim2.new(1, 0, 0, 90), 
+		Size = UDim2.new(1, -10, 0, 110), -- Tăng từ 90 lên 110 pixels
 		BackgroundColor3 = Theme.MidBg,
 		BackgroundTransparency = isUnlocked and 0.3 or 0.6,
 		[Fusion.Children] = {
@@ -118,8 +118,8 @@ local function RenderAchievementItem(scope, achData, props)
 			-- Icon
 			scope:New "TextLabel" {
 				Text = isUnlocked and (achData.Icon or "◆") or "○",
-				Size = UDim2.fromOffset(40, 40),
-				Position = UDim2.fromOffset(10, 10),
+			Size = UDim2.fromScale(0.06, 0.45),
+			Position = UDim2.fromScale(0.02, 0.1),
 				BackgroundTransparency = 1,
 				TextColor3 = isUnlocked and achColor or Color3.fromRGB(100, 100, 100),
 				Font = Enum.Font.Code,
@@ -130,9 +130,9 @@ local function RenderAchievementItem(scope, achData, props)
 			-- Tên Title
 			scope:New "TextLabel" {
 				Text = title, 
-				Size = UDim2.new(0.5, -60, 0, 24), 
-				BackgroundTransparency = 1, 
-				Position = UDim2.fromOffset(60, 8),
+			Size = UDim2.fromScale(0.5, 0.28), 
+			BackgroundTransparency = 1, 
+			Position = UDim2.fromScale(0.1, 0.08),
 				TextColor3 = scope:Computed(function(use) 
 					if not isUnlocked then return Color3.fromRGB(120, 120, 120) end
 					return use(isEquipped) and Theme.NeonGreen or achColor
@@ -149,8 +149,8 @@ local function RenderAchievementItem(scope, achData, props)
 			-- Description (Điều kiện)
 			scope:New "TextLabel" {
 				Text = "📋 " .. achData.Desc,
-				Size = UDim2.new(0.5, -60, 0, 18),
-				Position = UDim2.fromOffset(60, 36),
+			Size = UDim2.fromScale(0.5, 0.22),
+			Position = UDim2.fromScale(0.1, 0.4),
 				BackgroundTransparency = 1,
 				TextColor3 = isUnlocked and Color3.fromRGB(180, 180, 180) or Color3.fromRGB(100, 100, 100),
 				Font = Enum.Font.Code,
@@ -163,8 +163,8 @@ local function RenderAchievementItem(scope, achData, props)
 			-- Requirement Value
 			scope:New "TextLabel" {
 				Text = string.format("🎯 %s: %s", achData.Type, tostring(achData.Val)),
-				Size = UDim2.new(0.5, -60, 0, 18),
-				Position = UDim2.fromOffset(60, 58),
+			Size = UDim2.fromScale(0.5, 0.22),
+			Position = UDim2.fromScale(0.1, 0.65),
 				BackgroundTransparency = 1,
 				TextColor3 = isUnlocked and Color3.fromRGB(150, 255, 150) or Color3.fromRGB(80, 100, 80),
 				Font = Enum.Font.Code,
@@ -177,8 +177,8 @@ local function RenderAchievementItem(scope, achData, props)
 			CyberButton(scope, {
 				Text = btnText,
 				Color = btnColor,
-				Size = UDim2.fromOffset(100, 40), 
-				Position = UDim2.new(1, -12, 0.5, 0), 
+			Size = UDim2.fromScale(0.15, 0.45), 
+			Position = UDim2.fromScale(0.98, 0.5), 
 				AnchorPoint = Vector2.new(1, 0.5),
 				Disabled = btnDisabled,
 				OnClick = function() 
@@ -254,7 +254,6 @@ function AchievementView.New(scope, props)
 				BackgroundTransparency = 0.1,
 				[Fusion.Children] = {
 					scope:New "UICorner" { CornerRadius = UDim.new(0, 20) },
-					scope:New "UIAspectRatioConstraint" { AspectRatio = 1.07 },
 					scope:New "UIStroke" { 
 						Thickness = 3.5,
 						Transparency = 0,
@@ -302,24 +301,13 @@ function AchievementView.New(scope, props)
 								Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 0.5,
 								[Fusion.Children] = {
 									scope:New "UICorner" { CornerRadius = UDim.new(0, 12) },
-									scope:New "TextLabel" {
-										Text = "◢ ACHIEVEMENTS ◣", 
-										Size = UDim2.new(1, 0, 0, 50), 
-										BackgroundTransparency = 1,
-										TextColor3 = Theme.NeonPurple, 
-										Font = Enum.Font.Code, 
-										TextSize = 22,
-										TextScaled = true,
-										TextStrokeTransparency = 0.5,
-										ZIndex = 2
-									},
-									scope:New "ScrollingFrame" {
-										Size = UDim2.new(1, -20, 1, -65), Position = UDim2.new(0.5, 0, 0, 60),
-										AnchorPoint = Vector2.new(0.5, 0),
+								scope:New "ScrollingFrame" {
+									Size = UDim2.new(1, -20, 1, -20), Position = UDim2.new(0.5, 0, 0.5, 0),
+									AnchorPoint = Vector2.new(0.5, 0.5),
 										BackgroundTransparency = 1, AutomaticCanvasSize = "Y", CanvasSize = UDim2.new(),
 										ScrollBarThickness = 6, ScrollBarImageColor3 = Theme.NeonPurple,
 										[Fusion.Children] = {
-											scope:New "UIListLayout" { Padding = UDim.new(0, 10) },
+									scope:New "UIListLayout" { Padding = UDim.new(0, 12) },
 											scope:ForValues(AchievementList, function(use, inner, achData)
 												return RenderAchievementItem(inner, achData, props)
 											end)
