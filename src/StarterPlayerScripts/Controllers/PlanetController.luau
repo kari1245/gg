@@ -1,358 +1,245 @@
--- PlanetController: Client-side planet streaming and rendering
--- Clean, robust, idiomatic Luau for Roblox
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- PlanetController: Minimal, stateless client. Only renders planets using server metadata.
 local Players = game:GetService("Players")
-local Lighting = game:GetService("Lighting")
-local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local MAX_RENDERED_PLANETS = 17
-local PLANET_SPAWN_RADIUS = 12000
-local ATMOSPHERE_BUFFER = 3000
-local UPDATE_INTERVAL = 2
 
 local RenderedPlanets = {}
 
-local function CleanupOrphanedPlanetModels()
-    for _, model in ipairs(workspace:GetChildren()) do
-        if model:IsA("Model") and model.Name:match("^Planet_") then
-            local found = false
-            for _, tracked in pairs(RenderedPlanets) do
-                if tracked == model then
-                    found = true
-                    break
-                end
-            end
-            if not found then
+-- Default space lighting/sky config
+local DEFAULT_LIGHTING = {
+	Brightness = 1.5,
+	Ambient = Color3.fromRGB(10,10,20), -- giảm ambient để bóng rõ hơn
+	OutdoorAmbient = Color3.fromRGB(20,20,30),
+	EnvironmentDiffuseScale = 1.1, -- tăng mạnh bóng khuếch tán
+	EnvironmentSpecularScale = 0.35, -- tăng bóng gương
+}
+local DEFAULT_SKY_NAME = "Space"
+local function applyLightingConfig(bloom)
+	local Lighting = game:GetService("Lighting")
+	if not bloom then bloom = {} end
+	if bloom.Brightness ~= nil then Lighting.Brightness = bloom.Brightness else Lighting.Brightness = DEFAULT_LIGHTING.Brightness end
+	if bloom.Ambient ~= nil then Lighting.Ambient = Color3.new(bloom.Ambient.R, bloom.Ambient.G, bloom.Ambient.B) else Lighting.Ambient = DEFAULT_LIGHTING.Ambient end
+	if bloom.OutdoorAmbient ~= nil then Lighting.OutdoorAmbient = Color3.new(bloom.OutdoorAmbient.R, bloom.OutdoorAmbient.G, bloom.OutdoorAmbient.B) else Lighting.OutdoorAmbient = DEFAULT_LIGHTING.OutdoorAmbient end
+	if bloom.EnvironmentDiffuseScale ~= nil then Lighting.EnvironmentDiffuseScale = bloom.EnvironmentDiffuseScale else Lighting.EnvironmentDiffuseScale = DEFAULT_LIGHTING.EnvironmentDiffuseScale end
+	if bloom.EnvironmentSpecularScale ~= nil then Lighting.EnvironmentSpecularScale = bloom.EnvironmentSpecularScale else Lighting.EnvironmentSpecularScale = DEFAULT_LIGHTING.EnvironmentSpecularScale end
+	-- ColorCorrection
+	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+	if not cc then cc = Instance.new("ColorCorrectionEffect"); cc.Parent = Lighting end
+	if bloom.ColorCorrection then
+		cc.Brightness = bloom.ColorCorrection.Brightness or 0
+		cc.Contrast = bloom.ColorCorrection.Contrast or 0
+		cc.Saturation = bloom.ColorCorrection.Saturation or 0
+		if bloom.ColorCorrection.TintColor then
+			cc.TintColor = Color3.new(bloom.ColorCorrection.TintColor.R, bloom.ColorCorrection.TintColor.G, bloom.ColorCorrection.TintColor.B)
+		end
+	else
+		cc.Brightness = 0; cc.Contrast = 0; cc.Saturation = 0; cc.TintColor = Color3.new(1,1,1)
+	end
+	-- BloomEffect
+	local bloomFx = Lighting:FindFirstChildOfClass("BloomEffect")
+	if not bloomFx then bloomFx = Instance.new("BloomEffect"); bloomFx.Parent = Lighting end
+	bloomFx.Intensity = bloom.BloomIntensity or 0.08
+	bloomFx.Size = bloom.BloomSize or 24
+	bloomFx.Threshold = bloom.BloomThreshold or 1.3
+end
+
+local function applySky(skyName)
+	local Lighting = game:GetService("Lighting")
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	-- Remove old sky
+	for _, obj in ipairs(Lighting:GetChildren()) do
+		if obj:IsA("Sky") then obj:Destroy() end
+	end
+	local skies = ReplicatedStorage:FindFirstChild("Skies")
+	if not skyName or skyName == "" or skyName == DEFAULT_SKY_NAME then
+		-- Luôn clone sky 'space' (chữ thường) nếu có
+		if skies then
+			local sky = skies:FindFirstChild("space")
+			if sky and sky:IsA("Sky") then
+				local clone = sky:Clone()
+				clone.Parent = Lighting
+			end
+		end
+		return
+	end
+	if skies then
+		local sky = skies:FindFirstChild(skyName)
+		if sky and sky:IsA("Sky") then
+			local clone = sky:Clone()
+			clone.Parent = Lighting
+		end
+	end
+end
+
+local function CreatePlanetModel(data)
+	local key = data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
+	local planetModel = Instance.new("Model")
+	planetModel.Name = "Planet_" .. key
+	-- Atmosphere
+	local centerPos = Vector3.new(data.WorldPos.X, data.WorldPos.Y, data.WorldPos.Z)
+	if data.GroundTiles and #data.GroundTiles > 0 then
+		local sum = Vector3.new(0,0,0)
+		for _, tile in ipairs(data.GroundTiles) do
+			sum = sum + Vector3.new(tile.Position.X, tile.Position.Y, tile.Position.Z)
+		end
+		centerPos = sum / #data.GroundTiles
+	end
+	local atmosphere = Instance.new("Part")
+	atmosphere.Name = "Atmosphere"
+	atmosphere.Size = Vector3.new(data.Size, data.Size, data.Size)
+	atmosphere.Position = centerPos
+	atmosphere.Anchored = true
+	atmosphere.CanCollide = false
+	atmosphere.Material = Enum.Material.Neon
+	atmosphere.Color = Color3.new(data.Biome.Color.R, data.Biome.Color.G, data.Biome.Color.B)
+	atmosphere.Shape = Enum.PartType.Ball
+	atmosphere.Transparency = 0 -- hoàn toàn đục
+	atmosphere.CastShadow = false -- không đổ bóng lên ground
+	pcall(function() atmosphere.LocalTransparencyModifier = 0 end)
+	atmosphere.Parent = planetModel
+
+	-- Không tự động áp dụng ánh sáng ở đây nữa, sẽ xử lý theo vị trí player
+	-- Ground
+	if data.GroundTiles then
+		local groundFolder = Instance.new("Folder")
+		groundFolder.Name = "GroundTiles"
+		groundFolder.Parent = planetModel
+		for _, tileData in ipairs(data.GroundTiles) do
+			local tile = Instance.new("Part")
+			tile.Name = "Tile"
+			tile.Size = Vector3.new(tileData.Size.X, tileData.Size.Y, tileData.Size.Z)
+			tile.Position = Vector3.new(tileData.Position.X, tileData.Position.Y, tileData.Position.Z)
+			tile.Anchored = true
+			tile.Material = Enum.Material.Plastic
+			tile.Color = Color3.new(tileData.Color.R, tileData.Color.G, tileData.Color.B)
+			tile.TopSurface = tileData.TopSurface == "Studs" and Enum.SurfaceType.Studs or Enum.SurfaceType.Smooth
+			tile.BottomSurface = tileData.BottomSurface == "Studs" and Enum.SurfaceType.Studs or Enum.SurfaceType.Smooth
+			tile.Parent = groundFolder
+		end
+	end
+	-- Objects
+	if data.Objects then
+		local objectsFolder = Instance.new("Folder")
+		objectsFolder.Name = "Objects"
+		objectsFolder.Parent = planetModel
+		local treesFolder = ReplicatedStorage:FindFirstChild("Trees")
+		local rocksFolder = ReplicatedStorage:FindFirstChild("Rocks")
+		for _, obj in ipairs(data.Objects) do
+			local model = nil
+			if obj.Type == "Tree" and treesFolder then
+				model = treesFolder:FindFirstChild(obj.Model)
+			elseif obj.Type == "Rock" and rocksFolder then
+				model = rocksFolder:FindFirstChild(obj.Model)
+			end
+			if model then
+				local clone = model:Clone()
+				clone.Name = obj.Type
+				if clone.PrimaryPart then
+					clone:SetPrimaryPartCFrame(CFrame.new(obj.PosX or 0, obj.PosY or 0, obj.PosZ or 0))
+				else
+					clone.Parent = objectsFolder
+					clone:SetPrimaryPartCFrame(CFrame.new(obj.PosX or 0, obj.PosY or 0, obj.PosZ or 0))
+				end
+				clone.Parent = objectsFolder
+			else
+				-- fallback: create a colored part if model missing
+				local part = Instance.new("Part")
+				part.Name = obj.Type .. (obj.Model or "")
+				part.Size = Vector3.new(obj.SizeX or 8, obj.SizeY or 16, obj.SizeZ or 8)
+				part.Anchored = true
+				part.Position = Vector3.new(obj.PosX or 0, obj.PosY or 0, obj.PosZ or 0)
+				if obj.Color then
+					part.Color = Color3.new(obj.Color.R, obj.Color.G, obj.Color.B)
+				elseif obj.Type == "Tree" then
+					part.Color = Color3.fromRGB(34, 139, 34)
+				else
+					part.Color = Color3.fromRGB(120, 120, 120)
+				end
+				part.Parent = objectsFolder
+			end
+		end
+	end
+	planetModel.Parent = workspace
+	return planetModel
+end
+
+local HttpService = game:GetService("HttpService")
+
+
+-- Helper: kiểm tra player có đang trong atmosphere planet nào không
+local function getCurrentPlanetInAtmosphere(planets, playerPos)
+	for _, data in ipairs(planets) do
+		local center = Vector3.new(data.WorldPos.X, data.WorldPos.Y, data.WorldPos.Z)
+		local radius = data.Size/2
+		if (playerPos - center).Magnitude < radius then
+			return data
+		end
+	end
+	return nil
+end
+
+
+local lastPlanetKey = nil
+local lastSkyName = nil
+
+function RenderPlanetsFromServer(planets)
+    -- Build new set of keys
+    local newKeys = {}
+    local newData = {}
+    for _, data in ipairs(planets) do
+        local key = data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
+        newKeys[key] = true
+        newData[key] = data
+    end
+    -- Destroy models for planets no longer present
+    for key, model in pairs(RenderedPlanets) do
+        if not newKeys[key] then
+            if typeof(model) == "Instance" and model:IsA("Model") then
                 model:Destroy()
             end
-        end
-    end
-end
-
-local function IsPlanetOverlap(newPos, newSize)
-    for _, planet in pairs(RenderedPlanets) do
-        local atmosphere = planet:FindFirstChild("Atmosphere")
-        if atmosphere then
-            local dist = (atmosphere.Position - newPos).Magnitude
-            local minDist = (atmosphere.Size.X + newSize) / 2 + ATMOSPHERE_BUFFER
-            if dist < minDist then
-                return true
-            end
-        end
-    end
-    return false
-end
-
-
-local function CreatePlanetMesh(data)
-    local key = data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
-    if RenderedPlanets[key] then return RenderedPlanets[key] end
-
-    local count = 0
-    for _, planet in pairs(RenderedPlanets) do
-        if planet.PrimaryPart then count = count + 1 end
-    end
-    if count >= MAX_RENDERED_PLANETS then return nil end
-
-    if data.IsHome then
-        for _, planet in pairs(RenderedPlanets) do
-            if planet.PrimaryPart and planet.PrimaryPart:GetAttribute("IsHome") then
-                return planet
-            end
-        end
-    end
-
-    local worldPos = Vector3.new(data.WorldPos.X, data.WorldPos.Y, data.WorldPos.Z)
-    if not data.IsHome and IsPlanetOverlap(worldPos, data.Size) then
-        warn("Skipping planet due to overlap:", key)
-        return nil
-    end
-
-    local biomeColor = Color3.new(data.Biome.Color.R, data.Biome.Color.G, data.Biome.Color.B)
-    local planetModel = Instance.new("Model")
-    planetModel.Name = "Planet_" .. key
-
-    local atmosphere = Instance.new("Part")
-    atmosphere.Name = "Atmosphere"
-    atmosphere.Size = Vector3.new(data.Size, data.Size, data.Size)
-    atmosphere.Position = worldPos
-    atmosphere.Anchored = true
-    atmosphere.CanCollide = false
-    atmosphere.Material = Enum.Material.ForceField
-    atmosphere.Color = biomeColor
-    atmosphere.Shape = Enum.PartType.Ball
-    atmosphere.Material = Enum.Material.Neon
-    atmosphere.Transparency = 0
-    atmosphere.Parent = planetModel
-
-    -- Create classic baseplate ground (grid of small Parts) with randomization by planet content
-    local tileSize = 8
-    local groundHeight = 4
-    local numTiles = math.floor((data.Size * 0.5) / tileSize)
-    local startPos = worldPos + Vector3.new(-numTiles * tileSize / 2 + tileSize / 2, -10, -numTiles * tileSize / 2 + tileSize / 2)
-    local groundFolder = Instance.new("Folder")
-    groundFolder.Name = "GroundTiles"
-    groundFolder.Parent = planetModel
-    local seed = (data.Seed or 0) + (data.Biome and (data.Biome.Name:len() * 1000) or 0)
-    math.randomseed(seed)
-    local surfaceType = data.SurfaceType or Enum.SurfaceType.Studs
-    for x = 0, numTiles - 1 do
-        for z = 0, numTiles - 1 do
-            local tile = Instance.new("Part")
-            tile.Name = "Tile"
-            tile.Size = Vector3.new(tileSize, groundHeight, tileSize)
-            tile.Anchored = true
-            tile.Material = Enum.Material.Plastic
-            -- Áp dụng surfaceType từ server cho tất cả mặt
-            tile.TopSurface = surfaceType
-            tile.BottomSurface = surfaceType
-            tile.FrontSurface = surfaceType
-            tile.BackSurface = surfaceType
-            tile.LeftSurface = surfaceType
-            tile.RightSurface = surfaceType
-            -- Randomize color and height by planet biome/content
-            local baseColor = Color3.fromRGB(106, 127, 63)
-            if data.Biome and data.Biome.Name == "Desert" then
-                baseColor = Color3.fromRGB(220, 180, 100)
-            elseif data.Biome and data.Biome.Name == "Ocean" then
-                baseColor = Color3.fromRGB(30, 100, 180)
-            elseif data.Biome and data.Biome.Name == "Forest" then
-                baseColor = Color3.fromRGB(50, 150, 50)
-            elseif data.Biome and data.Biome.Name == "Ice" then
-                baseColor = Color3.fromRGB(200, 230, 255)
-            elseif data.Biome and data.Biome.Name == "Volcanic" then
-                baseColor = Color3.fromRGB(80, 40, 20)
-            elseif data.Biome and data.Biome.Name == "Toxic" then
-                baseColor = Color3.fromRGB(150, 255, 50)
-            elseif data.Biome and data.Biome.Name == "Crystal" then
-                baseColor = Color3.fromRGB(200, 100, 255)
-            elseif data.Biome and data.Biome.Name == "Glitch" then
-                baseColor = Color3.fromRGB(255, 0, 255)
-            end
-            -- Slight random variation
-            local colorOffset = math.random(-10, 10)
-            tile.Color = Color3.new(
-                math.clamp(baseColor.R + colorOffset/255, 0, 1),
-                math.clamp(baseColor.G + colorOffset/255, 0, 1),
-                math.clamp(baseColor.B + colorOffset/255, 0, 1)
-            )
-            tile.Reflectance = 0
-            tile.CastShadow = false -- Tắt bóng đổ để baseplate luôn sáng
-            tile.Position = startPos + Vector3.new(x * tileSize, math.random(-1,1), z * tileSize)
-            tile.Parent = groundFolder
-        end
-    end
-    -- Set PrimaryPart to first tile for teleport/spawn
-    if #groundFolder:GetChildren() > 0 then
-        planetModel.PrimaryPart = groundFolder:GetChildren()[1]
-    elseif planetModel:FindFirstChild("Atmosphere") then
-        planetModel.PrimaryPart = planetModel.Atmosphere
-    end
-    planetModel.Parent = workspace
-    RenderedPlanets[key] = planetModel
-    -- Store sky index for this planet (from server)
-    planetModel:SetAttribute("SkyPresetIndex", data.SkyPresetIndex or 1)
-    -- Store sky name for this planet (from client)
-    planetModel:SetAttribute("SkyPresetName", data.SkyPresetName or "")
-    -- Store Bloom data for this planet
-    if data.Bloom then
-        planetModel:SetAttribute("Bloom", HttpService:JSONEncode(data.Bloom))
-    end
-    return planetModel
-end
-
-local function CleanupDistantPlanets(playerPos)
-    local count = 0
-    local keepKeys = {}
-    for key, planet in pairs(RenderedPlanets) do
-        if planet and planet.PrimaryPart then
-            local distance = (planet.PrimaryPart.Position - playerPos).Magnitude
-            local isHome = planet.PrimaryPart:GetAttribute("IsHome")
-            if isHome or distance < PLANET_SPAWN_RADIUS then
-                count = count + 1
-                keepKeys[key] = true
-            end
-        end
-    end
-    if count > MAX_RENDERED_PLANETS then
-        local planetsList = {}
-        for key, planet in pairs(RenderedPlanets) do
-            if planet and planet.PrimaryPart and not planet.PrimaryPart:GetAttribute("IsHome") then
-                local distance = (planet.PrimaryPart.Position - playerPos).Magnitude
-                table.insert(planetsList, {key = key, dist = distance})
-            end
-        end
-        table.sort(planetsList, function(a, b) return a.dist > b.dist end)
-        local toRemove = count - MAX_RENDERED_PLANETS
-        for i = 1, toRemove do
-            local entry = planetsList[i]
-            if entry and RenderedPlanets[entry.key] then
-                RenderedPlanets[entry.key]:Destroy()
-                RenderedPlanets[entry.key] = nil
-            end
-        end
-    end
-    local allKeys, homeKey = {}, nil
-    for key, planet in pairs(RenderedPlanets) do
-        if planet and planet.PrimaryPart then
-            if planet.PrimaryPart:GetAttribute("IsHome") then
-                homeKey = key
-            else
-                table.insert(allKeys, key)
-            end
-        end
-    end
-    while (#allKeys + (homeKey and 1 or 0)) > MAX_RENDERED_PLANETS do
-        local key = table.remove(allKeys)
-        if key and RenderedPlanets[key] then
-            RenderedPlanets[key]:Destroy()
             RenderedPlanets[key] = nil
         end
     end
-    CleanupOrphanedPlanetModels()
-end
-
-local SkiesFolder = ReplicatedStorage:WaitForChild("Skies")
-
-local function GetAllSkyPresets()
-    local skies = {}
-    for _, obj in ipairs(SkiesFolder:GetChildren()) do
-        if obj:IsA("Sky") then
-            table.insert(skies, obj)
-        end
-    end
-    table.sort(skies, function(a, b) return a.Name < b.Name end) -- Ensure order is stable
-    return skies
-end
-
-local function GetSkyByIndex(idx)
-    local skies = GetAllSkyPresets()
-    if #skies == 0 then return nil end
-    idx = ((idx - 1) % #skies) + 1
-    return skies[idx]
-end
-
-local function GetSkyByName(name)
-    for _, obj in ipairs(SkiesFolder:GetChildren()) do
-        if obj:IsA("Sky") and obj.Name == name then
-            return obj
-        end
-    end
-    return nil
-end
-
-local DEFAULT_SPACE_SKY_NAME = "space"
-
-local function HideOtherPlanets(exceptKey)
-    for key, planet in pairs(RenderedPlanets) do
-        if key ~= exceptKey then
-            planet.Parent = nil -- Hide from workspace
-        else
-            planet.Parent = workspace
-        end
-    end
-end
-
-local function ShowAllPlanets()
-    for key, planet in pairs(RenderedPlanets) do
-        planet.Parent = workspace
-    end
-end
-
-local function ApplyPlanetBloom(bloomData)
-    if not bloomData then
-        print("[PlanetController] No bloom data, using default.")
-        return
-    end
-    print("[PlanetController] Applying Bloom:", HttpService:JSONEncode(bloomData))
-    Lighting.Brightness = bloomData.Brightness or 2
-    Lighting.Ambient = Color3.new(1,1,1) -- Đảm bảo sáng đều
-    Lighting.OutdoorAmbient = Color3.new(1,1,1)
-    Lighting.EnvironmentDiffuseScale = 1
-    Lighting.EnvironmentSpecularScale = 1
-    -- Remove old bloom
-    for _, obj in ipairs(Lighting:GetChildren()) do
-        if obj:IsA("BloomEffect") then obj:Destroy() end
-    end
-    -- Add new bloom
-    local bloom = Instance.new("BloomEffect")
-    bloom.Intensity = bloomData.BloomIntensity or 0.2
-    bloom.Size = bloomData.BloomSize or 24
-    bloom.Threshold = bloomData.BloomThreshold or 1
-    bloom.Parent = Lighting
-end
-
-local function ResetToDefaultBloom()
-    print("[PlanetController] Reset to default bloom.")
-    Lighting.Brightness = 2
-    Lighting.Ambient = Color3.fromRGB(127,127,127)
-    Lighting.OutdoorAmbient = Color3.fromRGB(127,127,127)
-    Lighting.EnvironmentDiffuseScale = 1
-    Lighting.EnvironmentSpecularScale = 1
-    for _, obj in ipairs(Lighting:GetChildren()) do
-        if obj:IsA("BloomEffect") then obj:Destroy() end
-    end
-end
-
-local lastPlanetKey = nil
-local lastSkyClone = nil
-local insideAtmosphere = false
-local function UpdatePlanetSky(playerPos)
-    local closestKey, closestDist, closestPlanet, closestAtmosphere, closestRadius = nil, math.huge, nil, nil, nil
-    for key, planet in pairs(RenderedPlanets) do
-        local atmosphere = planet:FindFirstChild("Atmosphere")
-        if atmosphere then
-            local dist = (atmosphere.Position - playerPos).Magnitude
-            local radius = atmosphere.Size.X/2
-            if dist < closestDist then
-                closestDist = dist
-                closestKey = key
-                closestPlanet = planet
-                closestAtmosphere = atmosphere
-                closestRadius = radius
+    -- Create or update models for new/changed planets
+    for key, data in pairs(newData) do
+        local oldModel = RenderedPlanets[key]
+        local oldMeta = oldModel and oldModel:GetAttribute("_MetaJson")
+        local newMeta = HttpService:JSONEncode(data)
+        if not oldModel or oldMeta ~= newMeta then
+            if oldModel and typeof(oldModel) == "Instance" and oldModel:IsA("Model") then
+                oldModel:Destroy()
             end
+            local model = CreatePlanetModel(data)
+            model:SetAttribute("_MetaJson", newMeta)
+            RenderedPlanets[key] = model
         end
     end
-    if closestPlanet and closestAtmosphere and closestDist < (closestRadius + 100) then
-        if lastPlanetKey ~= closestKey or not insideAtmosphere then
-            if lastSkyClone then lastSkyClone:Destroy() end
-            local skyName = closestPlanet:GetAttribute("SkyPresetName") or closestPlanet.SkyPresetName or (closestPlanet._data and closestPlanet._data.SkyPresetName)
-            local src = GetSkyByName(skyName)
-            if src and src:IsA("Sky") then
-                lastSkyClone = src:Clone()
-                for _, obj in ipairs(Lighting:GetChildren()) do
-                    if obj:IsA("Sky") then obj:Destroy() end
-                end
-                lastSkyClone.Parent = Lighting
-            end
-            -- Áp dụng bloom/ánh sáng từ server
-            local bloomData = nil
-            local bloomAttr = closestPlanet:GetAttribute("Bloom")
-            if bloomAttr then
-                local ok, decoded = pcall(function() return HttpService:JSONDecode(bloomAttr) end)
-                if ok then bloomData = decoded end
-            end
-            ApplyPlanetBloom(bloomData)
-            HideOtherPlanets(closestKey)
-            lastPlanetKey = closestKey
-            insideAtmosphere = true
+
+    -- Xác định player đang ở trong planet nào (nếu có)
+    local player = Players.LocalPlayer
+    local char = player and player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local playerPos = root and root.Position
+    local inPlanet = nil
+    if playerPos then
+        inPlanet = getCurrentPlanetInAtmosphere(planets, playerPos)
+    end
+    if inPlanet then
+        -- Đang trong atmosphere: set lighting/sky theo planet
+        local planetKey = inPlanet.GridPos.X .. "_" .. inPlanet.GridPos.Y .. "_" .. inPlanet.GridPos.Z
+        if lastPlanetKey ~= planetKey then
+            applyLightingConfig(inPlanet.Bloom)
+            applySky(inPlanet.SkyPresetName)
+            lastPlanetKey = planetKey
+            lastSkyName = inPlanet.SkyPresetName
         end
     else
-        if insideAtmosphere or lastPlanetKey ~= nil then
-            if lastSkyClone then lastSkyClone:Destroy() lastSkyClone = nil end
-            -- Apply default space sky
-            local spaceSky = GetSkyByName(DEFAULT_SPACE_SKY_NAME)
-            if spaceSky then
-                for _, obj in ipairs(Lighting:GetChildren()) do
-                    if obj:IsA("Sky") then obj:Destroy() end
-                end
-                spaceSky:Clone().Parent = Lighting
-            end
-            ResetToDefaultBloom()
-            ShowAllPlanets()
-            insideAtmosphere = false
-            lastPlanetKey = nil
+        -- Ngoài atmosphere: set lighting/sky về mặc định (space)
+        if lastPlanetKey ~= "_space_" then
+            applyLightingConfig(nil)
+            applySky(DEFAULT_SKY_NAME)
+            lastPlanetKey = "_space_"
+            lastSkyName = DEFAULT_SKY_NAME
         end
     end
 end
@@ -360,189 +247,69 @@ end
 local PlanetController = {}
 
 function PlanetController.Init()
-    local player = Players.LocalPlayer
-    local GetPlanetsRemote = ReplicatedStorage:WaitForChild("GetPlanetsRemote")
-    local DESTROY_HEIGHT = workspace.FallenPartsDestroyHeight or -500
-    local PLANET_Y = DESTROY_HEIGHT + 3000
+	local player = Players.LocalPlayer
+	local GetPlanetsRemote = ReplicatedStorage:WaitForChild("GetPlanetsRemote")
+	local DESTROY_HEIGHT = workspace.FallenPartsDestroyHeight or -500
+	local PLANET_Y = DESTROY_HEIGHT + 3000
+	task.defer(function()
+		local character = player.Character or player.CharacterAdded:Wait()
+		local rootPart = character:WaitForChild("HumanoidRootPart")
+		rootPart.Anchored = true
+		rootPart.CFrame = CFrame.new(0, PLANET_Y + 200, 0)
+		-- Always render home planet first and teleport player onto it
+		local pos = Vector3.new(0, PLANET_Y, 0)
+		local success, planets = pcall(function()
+			return GetPlanetsRemote:InvokeServer(pos)
+		end)
+		assert(success and planets and #planets > 0, "No planet data from server!")
+		-- Find home planet and spawn player on it
+		local homePlanetData = nil
+		for _, data in ipairs(planets) do
+			if data.IsHome then
+				data.WorldPos.Y = PLANET_Y
+				homePlanetData = data
+				break
+			end
+		end
+		assert(homePlanetData, "Home planet data not found!")
+		local homePlanetModel = CreatePlanetModel(homePlanetData)
+		assert(homePlanetModel, "Home planet model not created!")
+		-- Teleport player to home planet center
+		local spawnCFrame = nil
+		local groundFolder = homePlanetModel:FindFirstChild("GroundTiles")
+		local centerTile = nil
+		if groundFolder then
+			local minDist = math.huge
+			for _, tile in ipairs(groundFolder:GetChildren()) do
+				if tile:IsA("BasePart") then
+					local dist = (tile.Position - Vector3.new(0, tile.Position.Y, 0)).Magnitude
+					if dist < minDist then
+						centerTile = tile
+						minDist = dist
+					end
+				end
+			end
+		end
+		if centerTile then
+			spawnCFrame = CFrame.new(centerTile.Position + Vector3.new(0, centerTile.Size.Y/2 + 3, 0))
+		else
+			spawnCFrame = CFrame.new(Vector3.new(homePlanetData.WorldPos.X, homePlanetData.WorldPos.Y + 6, homePlanetData.WorldPos.Z))
+		end
+		rootPart.CFrame = spawnCFrame
+		rootPart.Anchored = false
 
-    task.defer(function()
-        local character = player.Character or player.CharacterAdded:Wait()
-        local rootPart = character:WaitForChild("HumanoidRootPart")
-        rootPart.Anchored = true
-        rootPart.CFrame = CFrame.new(0, PLANET_Y + 200, 0)
-
-        local homePlanetPos = nil
-
-        -- 1. Always create/render home planet first and teleport player onto it
-        local homePlanetData = nil
-        do
-            local pos = Vector3.new(0, PLANET_Y, 0)
-            local success, planets = pcall(function()
-                return GetPlanetsRemote:InvokeServer(pos)
-            end)
-            if success and planets then
-                for _, data in ipairs(planets) do
-                    if data.IsHome then
-                        data.WorldPos.Y = PLANET_Y
-                        homePlanetData = data
-                        break
-                    end
-                end
-            end
-        end
-        assert(homePlanetData, "Home planet data not found!")
-        local homePlanetModel = CreatePlanetMesh(homePlanetData)
-        assert(homePlanetModel, "Home planet model not created!")
-        -- Teleport player onto home planet
-        local spawnCFrame = nil
-        local homeSpawn = homePlanetModel:FindFirstChild("HomeSpawn")
-        if homeSpawn then
-            spawnCFrame = homeSpawn.CFrame + Vector3.new(0, homeSpawn.Size.Y/2 + 3, 0)
-        else
-            local ground = homePlanetModel:FindFirstChild("Ground")
-            if ground then
-                spawnCFrame = ground.CFrame + Vector3.new(0, ground.Size.Y/2 + 3, 0)
-            end
-        end
-        if spawnCFrame then
-            rootPart.CFrame = spawnCFrame
-        else
-            rootPart.CFrame = CFrame.new(Vector3.new(homePlanetData.WorldPos.X, homePlanetData.WorldPos.Y + 30, homePlanetData.WorldPos.Z))
-        end
-        rootPart.Anchored = false
-
-        -- 2. Now render neighbors and other planets as before
-        local function RenderNeighborsAndOthers()
-            local gridOffsets = {
-                {1,0,0}, {-1,0,0}, {0,1,0}, {0,-1,0}, {0,0,1}, {0,0,-1},
-            }
-            local renderedKeys = {}
-            -- Mark home planet as rendered
-            local homeKey = homePlanetData.GridPos.X .. "_" .. homePlanetData.GridPos.Y .. "_" .. homePlanetData.GridPos.Z
-            renderedKeys[homeKey] = true
-            -- Render neighbors
-            for _, offset in ipairs(gridOffsets) do
-                local gx = homePlanetData.GridPos.X + offset[1]
-                local gy = homePlanetData.GridPos.Y + offset[2]
-                local gz = homePlanetData.GridPos.Z + offset[3]
-                local pos = Vector3.new(gx * 1800, PLANET_Y + gy * 1800, gz * 1800)
-                local success, planets = pcall(function()
-                    return GetPlanetsRemote:InvokeServer(pos)
-                end)
-                if success and planets then
-                    for _, data in ipairs(planets) do
-                        data.WorldPos.Y = PLANET_Y + (data.GridPos.Y or gy) * 1800
-                        local key = (data.GridPos.X or gx) .. "_" .. (data.GridPos.Y or gy) .. "_" .. (data.GridPos.Z or gz)
-                        if not renderedKeys[key] and not data.IsHome then
-                            renderedKeys[key] = true
-                            CreatePlanetMesh(data)
-                        end
-                    end
-                end
-            end
-            -- Fill up to MAX_RENDERED_PLANETS with other nearby planets
-            local count = 0
-            for _, planet in pairs(RenderedPlanets) do
-                if planet.PrimaryPart then count = count + 1 end
-            end
-            if count < MAX_RENDERED_PLANETS then
-                local playerPos = Vector3.new(homePlanetData.WorldPos.X, PLANET_Y, homePlanetData.WorldPos.Z)
-                local success, planets = pcall(function()
-                    return GetPlanetsRemote:InvokeServer(playerPos)
-                end)
-                if success and planets then
-                    for _, data in ipairs(planets) do
-                        if count >= MAX_RENDERED_PLANETS then break end
-                        data.WorldPos.Y = PLANET_Y
-                        local key = data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
-                        if not renderedKeys[key] and not data.IsHome then
-                            if not IsPlanetOverlap(Vector3.new(data.WorldPos.X, data.WorldPos.Y, data.WorldPos.Z), data.Size) then
-                                CreatePlanetMesh(data)
-                                count = count + 1
-                            end
-                        end
-                    end
-                end
-            end
-            -- Cleanup if over cap
-            local allKeys, homeKey2 = {}, nil
-            for key, planet in pairs(RenderedPlanets) do
-                if planet and planet.PrimaryPart then
-                    if planet.PrimaryPart:GetAttribute("IsHome") then
-                        homeKey2 = key
-                    else
-                        table.insert(allKeys, key)
-                    end
-                end
-            end
-            while (#allKeys + (homeKey2 and 1 or 0)) > MAX_RENDERED_PLANETS do
-                local key = table.remove(allKeys)
-                if key and RenderedPlanets[key] then
-                    RenderedPlanets[key]:Destroy()
-                    RenderedPlanets[key] = nil
-                end
-            end
-            CleanupOrphanedPlanetModels()
-        end
-
-        RenderNeighborsAndOthers()
-
-        local function StreamPlanets()
-            if not rootPart or not rootPart.Parent then return end
-            local playerPos = rootPart.Position
-            local count = 0
-            for _, planet in pairs(RenderedPlanets) do
-                if planet.PrimaryPart then count = count + 1 end
-            end
-            if count > MAX_RENDERED_PLANETS then
-                local allKeys, homeKey = {}, nil
-                for key, planet in pairs(RenderedPlanets) do
-                    if planet and planet.PrimaryPart then
-                        if planet.PrimaryPart:GetAttribute("IsHome") then
-                            homeKey = key
-                        else
-                            table.insert(allKeys, key)
-                        end
-                    end
-                end
-                while (#allKeys + (homeKey and 1 or 0)) > MAX_RENDERED_PLANETS do
-                    local key = table.remove(allKeys)
-                    if key and RenderedPlanets[key] then
-                        RenderedPlanets[key]:Destroy()
-                        RenderedPlanets[key] = nil
-                    end
-                end
-                CleanupOrphanedPlanetModels()
-                return
-            end
-            if count >= MAX_RENDERED_PLANETS then return end
-            local success, planets = pcall(function()
-                return GetPlanetsRemote:InvokeServer(playerPos)
-            end)
-            if success and planets then
-                local added = 0
-                for _, data in ipairs(planets) do
-                    data.WorldPos.Y = PLANET_Y
-                    if not data.IsHome then
-                        if added + count < MAX_RENDERED_PLANETS and not IsPlanetOverlap(Vector3.new(data.WorldPos.X, data.WorldPos.Y, data.WorldPos.Z), data.Size) then
-                            CreatePlanetMesh(data)
-                            added = added + 1
-                        end
-                    end
-                end
-            end
-        end
-
-        task.spawn(function()
-            while true do
-                StreamPlanets()
-                CleanupDistantPlanets(rootPart.Position)
-                UpdatePlanetSky(rootPart.Position)
-                task.wait(UPDATE_INTERVAL)
-            end
-        end)
-        print("🌍 Planet controller initialized (client-side rendering)")
-    end)
+		-- Main render loop: always fetch and render planets from server
+		while true do
+			local pos = rootPart.Position
+			local ok, planets = pcall(function()
+				return GetPlanetsRemote:InvokeServer(pos)
+			end)
+			if ok and planets then
+				RenderPlanetsFromServer(planets)
+			end
+			task.wait(0.5)
+		end
+	end)
 end
 
 return PlanetController
