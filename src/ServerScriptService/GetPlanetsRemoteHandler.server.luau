@@ -2,7 +2,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
-local PlanetService = require(script.Parent.PlanetService)
+local ServerScriptService = game:GetService("ServerScriptService")
+local PlanetService = require(ServerScriptService.Services.PlanetService)
 local Promise = require(ReplicatedStorage.Packages.Promise)
 local RemotesFolder = ReplicatedStorage:WaitForChild("Remotes") 
 local GetPlanetsRemote = RemotesFolder:WaitForChild("GetPlanetsRemote")
