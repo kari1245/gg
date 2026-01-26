@@ -6,26 +6,20 @@ local PLANET_GRID_SPACING = 3000
 local MIN_PLANET_SIZE = 500
 local MAX_PLANET_SIZE = 1500
 
--- [SERVER DECISION] Calculate Safe Height dynamically
--- Lấy độ cao hủy diệt của workspace, cộng thêm 2000 studs để an toàn
+-- [SERVER] Dynamic Safe Height
 local DESTROY_HEIGHT = workspace.FallenPartsDestroyHeight
-if DESTROY_HEIGHT == -50000 or DESTROY_HEIGHT == 0 then DESTROY_HEIGHT = -500 end -- Fallback default
-local HOME_PLANET_HEIGHT = DESTROY_HEIGHT + 2000 
+if DESTROY_HEIGHT == -50000 or DESTROY_HEIGHT == 0 then DESTROY_HEIGHT = -500 end 
 local DESTROY_BUFFER = 800
 
--- [HELPER] Jitter
 local function GetGridJitter(seed, amount)
 	local x = math.sin(seed) * 10000
 	return (x - math.floor(x)) * 2 * amount - amount
 end
 
--- [HELPER] Seeded Random
 local function SeededRandom(seed, min, max)
 	local x = math.sin(seed) * 10000
 	local frac = x - math.floor(x)
-	if min and max then
-		return min + frac * (max - min)
-	end
+	if min and max then return min + frac * (max - min) end
 	return frac
 end
 
@@ -48,7 +42,6 @@ local BiomeTypes = {
 	{Name = "Midnight", Color = Color3.fromRGB(20, 24, 82), Emissive = 0.2}
 }
 
--- Presets
 local SKY_PRESET_NAMES = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }
 local BLOOM_PRESETS = {
 	{Brightness = 1.2, BloomIntensity = 0.08, BloomSize = 24, BloomThreshold = 1.3, Ambient = {R=30/255, G=30/255, B=40/255}, OutdoorAmbient = {R=40/255, G=40/255, B=50/255}, EnvironmentDiffuseScale = 1.1, EnvironmentSpecularScale = 0.35, ColorCorrection = {Brightness = 0.1, Contrast = 0.03, Saturation = -0.05, TintColor = {R=240/255, G=240/255, B=255/255}}},
@@ -83,65 +76,42 @@ end
 -- ==============================================================================
 function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 	local seed = gridX * 73856093 + gridY * 19349663 + gridZ * 83492791
-	local isHome = (gridX == 0 and gridY == 0 and gridZ == 0)
+	
+	-- Jitter Logic
+	local jitterSeed = gridX*73856093 + gridY*19349663 + gridZ*83492791 + 12345
+	local jitterX = GetGridJitter(jitterSeed, PLANET_GRID_SPACING*0.25)
+	local jitterY = GetGridJitter(jitterSeed+1, PLANET_GRID_SPACING*0.25)
+	local jitterZ = GetGridJitter(jitterSeed+2, PLANET_GRID_SPACING*0.25)
 
-	-- 1. Calculate Jitter (Internal)
-	local jitterX, jitterY, jitterZ = 0, 0, 0
-	if not isHome then
-		local jitterSeed = gridX*73856093 + gridY*19349663 + gridZ*83492791 + 12345
-		jitterX = GetGridJitter(jitterSeed, PLANET_GRID_SPACING*0.25)
-		jitterY = GetGridJitter(jitterSeed+1, PLANET_GRID_SPACING*0.25)
-		jitterZ = GetGridJitter(jitterSeed+2, PLANET_GRID_SPACING*0.25)
-	end
+	local size = SeededRandom(seed + 1, MIN_PLANET_SIZE, MAX_PLANET_SIZE)
+	local biomeIndex = math.floor(SeededRandom(seed + 2, 1, #BiomeTypes + 0.99))
+	local biome = BiomeTypes[biomeIndex]
+	local skyPresetName = PickRandomSkyName(seed)
+	local bloomPreset = PickRandomBloomPreset(seed, biome.Name)
+	local surfaceType = tostring(PickRandomSurfaceType(seed))
+	
+	local baseX = gridX * PLANET_GRID_SPACING + jitterX
+	local baseY = gridY * PLANET_GRID_SPACING + jitterY
+	local baseZ = gridZ * PLANET_GRID_SPACING + jitterZ
 
-	local biome, skyPresetName, bloomPreset, surfaceType, size, worldPos
-
-	if isHome then
-		-- Home Planet: Fixed properties
-		biome = BiomeTypes[3] -- Ice/Default
-		skyPresetName = PickRandomSkyName(seed)
-		bloomPreset = PickRandomBloomPreset(seed, biome.Name)
-		surfaceType = tostring(PickRandomSurfaceType(seed))
-		size = 500
-		-- [SERVER FIX] Set WorldPos.Y to calculated SAFE height
-		worldPos = {X = 0, Y = HOME_PLANET_HEIGHT, Z = 0}
-	else
-		size = SeededRandom(seed + 1, MIN_PLANET_SIZE, MAX_PLANET_SIZE)
-		local biomeIndex = math.floor(SeededRandom(seed + 2, 1, #BiomeTypes + 0.99))
-		biome = BiomeTypes[biomeIndex]
-		skyPresetName = PickRandomSkyName(seed)
-		bloomPreset = PickRandomBloomPreset(seed, biome.Name)
-		surfaceType = tostring(PickRandomSurfaceType(seed))
-		
-		local baseX = gridX * PLANET_GRID_SPACING + jitterX
-		local baseY = gridY * PLANET_GRID_SPACING + jitterY
-		local baseZ = gridZ * PLANET_GRID_SPACING + jitterZ
-
-		local offsetX = SeededRandom(seed + 3, -500, 500)
-		local offsetY = SeededRandom(seed + 4, -1500, 1500)
-		local offsetZ = SeededRandom(seed + 5, -500, 500)
-		
-		worldPos = {
-			X = baseX + offsetX,
-			Y = baseY + offsetY,
-			Z = baseZ + offsetZ
-		}
-	end
+	local offsetX = SeededRandom(seed + 3, -500, 500)
+	local offsetY = SeededRandom(seed + 4, -1500, 1500)
+	local offsetZ = SeededRandom(seed + 5, -500, 500)
+	
+	local worldPos = {
+		X = baseX + offsetX,
+		Y = baseY + offsetY,
+		Z = baseZ + offsetZ
+	}
 
 	if not worldPos or not worldPos.X or not worldPos.Z or not size then return nil end
 
-	-- Check Destroy Height (Skip for home as we set it safely above)
-	if not isHome then
-		if worldPos.Y - size/2 < (DESTROY_HEIGHT + DESTROY_BUFFER) then return nil end
-		local distToHome = math.sqrt(worldPos.X^2 + (worldPos.Y - HOME_PLANET_HEIGHT)^2 + worldPos.Z^2)
-		local minSafeDistance = (2000 + size)/2 + 500
-		if distToHome < minSafeDistance then return nil end
-	end
+	-- Safety Checks
+	if worldPos.Y - size/2 < (DESTROY_HEIGHT + DESTROY_BUFFER) then return nil end
 	
-	-- 2. Ground Generation (Centered in Atmosphere)
+	-- Ground (Centered)
 	local groundDiameter = math.min(size * 0.4, size * 0.98)
 	local tileY = 3
-	-- Ground is exactly at Planet Center (Equator)
 	local groundY = worldPos.Y 
 	
 	local groundTiles = {
@@ -154,7 +124,7 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 		}
 	}
 
-	-- 3. Object Generation (Trees/Rocks)
+	-- Objects
 	local objects = {}
 	local groundArea = groundDiameter * groundDiameter
 	local treeDensity = math.clamp(math.floor(groundArea * 0.0012), 12, 120)
@@ -163,15 +133,12 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 	local numRocks = math.floor(SeededRandom(seed + 9999, 0, rockDensity + 0.99))
 	local objectMap = {}
 
-	-- Trees
 	for i = 1, numTrees do
 		local objSeed = seed + i * 1009 + 20000
 		local relX = SeededRandom(objSeed + 1, -0.5, 0.5) * (groundDiameter * 0.98)
 		local relZ = SeededRandom(objSeed + 2, -0.5, 0.5) * (groundDiameter * 0.98)
-		
-		-- Use WorldPos (jittered)
 		local posX = worldPos.X + relX 
-		local posY = groundY + tileY/2 -- Place ON TOP of the centered ground
+		local posY = groundY + tileY/2 
 		local posZ = worldPos.Z + relZ
 		local key = tostring(math.floor(posX*10))..","..tostring(math.floor(posZ*10))
 		
@@ -184,12 +151,10 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 		end
 	end
 
-	-- Rocks
 	for i = 1, numRocks do
 		local objSeed = seed + i * 2009 + 30000
 		local relX = SeededRandom(objSeed + 1, -0.5, 0.5) * (groundDiameter * 0.98)
 		local relZ = SeededRandom(objSeed + 2, -0.5, 0.5) * (groundDiameter * 0.98)
-		
 		local posX = worldPos.X + relX
 		local posY = groundY + tileY/2
 		local posZ = worldPos.Z + relZ
@@ -204,7 +169,7 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 		end
 	end
 
-	if not isHome and SeededRandom(seed) > 0.9 then return nil end
+	if SeededRandom(seed) > 0.9 then return nil end
 
 	return {
 		GridPos = {X = gridX, Y = gridY, Z = gridZ},
@@ -212,7 +177,7 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 		Size = size,
 		Biome = {Name = biome.Name, Color = {R = biome.Color.R, G = biome.Color.G, B = biome.Color.B}, Emissive = biome.Emissive},
 		Seed = seed,
-		IsHome = isHome,
+		IsHome = false,
 		SkyPresetName = skyPresetName,
 		Bloom = bloomPreset,
 		SurfaceType = surfaceType,
@@ -230,13 +195,6 @@ local function InitPlanetData(PlanetServiceRef)
 	local MIN_DIST = 2500
 	local NUM_PLANETS = 100
 
-	-- Force Home Planet Generation first
-	local homePlanet = PlanetServiceRef:GeneratePlanetData(0, 0, 0)
-	if homePlanet then
-		homePlanet.IsHome = true
-		table.insert(planets, homePlanet)
-	end
-
 	local gridSize = math.ceil(NUM_PLANETS^(1/3))
 	local used = {}
 	local function gridKey(x, y, z) return tostring(x)..","..tostring(y)..","..tostring(z) end
@@ -247,24 +205,22 @@ local function InitPlanetData(PlanetServiceRef)
 		local gy = (math.floor((i-1)/gridSize) % gridSize) - math.floor(gridSize/2)
 		local gz = (math.floor((i-1)/(gridSize*gridSize))) - math.floor(gridSize/2)
 		
-		if not (gx == 0 and gy == 0 and gz == 0) then
-			local key = gridKey(gx, gy, gz)
-			if not used[key] then
-				used[key] = true
-				local data = PlanetServiceRef:GeneratePlanetData(gx, gy, gz)
-				if data then
-					local tooClose = false
-					for _, p in ipairs(planets) do
-						local dist = math.sqrt((data.WorldPos.X - p.WorldPos.X)^2 + (data.WorldPos.Y - p.WorldPos.Y)^2 + (data.WorldPos.Z - p.WorldPos.Z)^2)
-						if dist < MIN_DIST then tooClose = true break end
-					end
-					if not tooClose then
-						data.IsHome = false
-						table.insert(planets, data)
-					end
+		local key = gridKey(gx, gy, gz)
+		if not used[key] then
+			used[key] = true
+			local data = PlanetServiceRef:GeneratePlanetData(gx, gy, gz)
+			if data then
+				local tooClose = false
+				for _, p in ipairs(planets) do
+					local dist = math.sqrt((data.WorldPos.X - p.WorldPos.X)^2 + (data.WorldPos.Y - p.WorldPos.Y)^2 + (data.WorldPos.Z - p.WorldPos.Z)^2)
+					if dist < MIN_DIST then tooClose = true break end
+				end
+				if not tooClose then
+					table.insert(planets, data)
 				end
 			end
 		end
+		
 		i = i + 1
 		if i > gridSize^3 + 1000 then break end
 	end
@@ -273,15 +229,12 @@ local function InitPlanetData(PlanetServiceRef)
 		local gx = math.random(-gridSize, gridSize)
 		local gy = math.random(-gridSize, gridSize)
 		local gz = math.random(-gridSize, gridSize)
-		if not (gx == 0 and gy == 0 and gz == 0) then
-			local key = gridKey(gx, gy, gz)
-			if not used[key] then
-				used[key] = true
-				local data = PlanetServiceRef:GeneratePlanetData(gx, gy, gz)
-				if data then
-					data.IsHome = false
-					table.insert(planets, data)
-				end
+		local key = gridKey(gx, gy, gz)
+		if not used[key] then
+			used[key] = true
+			local data = PlanetServiceRef:GeneratePlanetData(gx, gy, gz)
+			if data then
+				table.insert(planets, data)
 			end
 		end
 	end
@@ -294,30 +247,32 @@ function PlanetService:GetPlanetsNearPosition(position)
 	local planets = _planetDataCache or {}
 	if #planets == 0 then return {} end
 
-	local homeIdx = 1
-	for i, data in ipairs(planets) do if data.IsHome then homeIdx = i break end end
-	local homeData = planets[homeIdx]
-	
-	local result = {}
-	local added = {}
-	
-	if homeData then
-		table.insert(result, homeData)
-		added[homeIdx] = true
-	end
-
 	local nearby = {}
 	for i, data in ipairs(planets) do
-		if not added[i] then table.insert(nearby, data) end
+		table.insert(nearby, data) 
 	end
+	
 	table.sort(nearby, function(a, b)
 		local pa = Vector3.new(a.WorldPos.X, a.WorldPos.Y, a.WorldPos.Z)
 		local pb = Vector3.new(b.WorldPos.X, b.WorldPos.Y, b.WorldPos.Z)
 		return (pa - position).Magnitude < (pb - position).Magnitude
 	end)
 
+	local result = {}
+	local DETAIL_DISTANCE = 4000 
+
 	for i = 1, math.min(20, #nearby) do
-		table.insert(result, nearby[i])
+		local planetRaw = nearby[i]
+		local planetData = table.clone(planetRaw) 
+		
+		local dist = (Vector3.new(planetData.WorldPos.X, planetData.WorldPos.Y, planetData.WorldPos.Z) - position).Magnitude
+		
+		if dist > DETAIL_DISTANCE then
+			planetData.Objects = nil 
+			planetData.GroundTiles = nil 
+		end
+		
+		table.insert(result, planetData)
 	end
 
 	return result
