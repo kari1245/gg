@@ -156,7 +156,15 @@ local function CreatePlanetModel(data)
 			clone.Name = obj.Type
 			local cf = CFrame.new(obj.PosX, obj.PosY, obj.PosZ) * CFrame.Angles(0, math.rad(obj.RotY or 0), 0) * CFrame.new(0, (clone:IsA("Model") and 0 or clone.Size.Y/2), 0)
 			if clone:IsA("Model") then
-				if clone.PrimaryPart then clone:SetPrimaryPartCFrame(cf) else clone:SetPrimaryPartCFrame(cf) end
+				if clone:IsA("Model") then
+					if clone:IsA("Model") then
+						clone:PivotTo(cf)
+					else
+						clone.CFrame = cf
+					end
+				else
+					clone.CFrame = cf
+				end
 			else
 				clone.CFrame = cf
 			end
@@ -261,7 +269,8 @@ function RenderPlanetsFromServer(planets)
 end
 
 local function FetchPlanetsFromServer()
-	local GetPlanetsRemote = ReplicatedStorage:WaitForChild("GetPlanetsRemote")
+	local RemotesFolder = ReplicatedStorage:WaitForChild("Remotes") 
+	local GetPlanetsRemote = RemotesFolder:WaitForChild("GetPlanetsRemote")
 	if currentFetchPromise then currentFetchPromise:cancel() end
 	currentFetchPromise = Promise.new(function(resolve, reject, onCancel)
 		local data = GetPlanetsRemote:InvokeServer()

@@ -4,7 +4,8 @@ local Players = game:GetService("Players")
 
 local PlanetService = require(script.Parent.PlanetService)
 local Promise = require(ReplicatedStorage.Packages.Promise)
-local GetPlanetsRemote = ReplicatedStorage:WaitForChild("GetPlanetsRemote")
+local RemotesFolder = ReplicatedStorage:WaitForChild("Remotes") 
+local GetPlanetsRemote = RemotesFolder:WaitForChild("GetPlanetsRemote")
 
 -- [OPTIMIZATION] Rate Limiting Config
 local REQUEST_COOLDOWN = 0.3 -- Giới hạn 1 request mỗi 0.3 giây
