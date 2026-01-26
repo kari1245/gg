@@ -3,6 +3,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService") -- Dùng để check mỗi frame
 
+local Promise = require(ReplicatedStorage.Packages.Promise)
+
 local PlanetController = {}
 local RenderedPlanets = {}
 local AtmosphereState = { InAtmosphere = false, CurrentPlanetKey = nil }
@@ -18,20 +20,56 @@ local DEFAULT_LIGHTING = {
 	EnvironmentSpecularScale = 0.35,
 }
 
-local function applyLightingConfig(bloom)
+-- Fade effect helper
+local function fadeColorCorrection(target, duration, props)
+	duration = duration or 0.7
+	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect", Lighting)
+
+	local start = {}
+	for k, v in pairs(props) do
+		start[k] = cc[k]
+	end
+
+	local t = 0
+	while t < duration do
+		t = math.min(t + RunService.RenderStepped:Wait(), duration)
+		local alpha = t / duration
+		for k, v in pairs(props) do
+			if typeof(v) == "number" then
+				cc[k] = start[k] + (v - start[k]) * alpha
+			elseif typeof(v) == "Color3" then
+				local s = start[k] or Color3.new(1,1,1)
+				cc[k] = Color3.new(
+				s.R + (v.R - s.R) * alpha,
+				s.G + (v.G - s.G) * alpha,
+				s.B + (v.B - s.B) * alpha
+			)
+			end
+		end
+	end
+end
+
+local function applyLightingConfig(bloom, fade)
 	if not bloom then bloom = {} end
 	Lighting.Brightness = bloom.Brightness or DEFAULT_LIGHTING.Brightness
 	Lighting.Ambient = bloom.Ambient and Color3.new(bloom.Ambient.R, bloom.Ambient.G, bloom.Ambient.B) or DEFAULT_LIGHTING.Ambient
 	Lighting.OutdoorAmbient = bloom.OutdoorAmbient and Color3.new(bloom.OutdoorAmbient.R, bloom.OutdoorAmbient.G, bloom.OutdoorAmbient.B) or DEFAULT_LIGHTING.OutdoorAmbient
 	Lighting.EnvironmentDiffuseScale = bloom.EnvironmentDiffuseScale or DEFAULT_LIGHTING.EnvironmentDiffuseScale
 	Lighting.EnvironmentSpecularScale = bloom.EnvironmentSpecularScale or DEFAULT_LIGHTING.EnvironmentSpecularScale
-	
+
 	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect", Lighting)
 	local ccConf = bloom.ColorCorrection or {}
-	cc.Brightness = ccConf.Brightness or 0
-	cc.Contrast = ccConf.Contrast or 0
-	cc.Saturation = ccConf.Saturation or 0
-	cc.TintColor = ccConf.TintColor and Color3.new(ccConf.TintColor.R, ccConf.TintColor.G, ccConf.TintColor.B) or Color3.new(1,1,1)
+	local targetProps = {
+		Brightness = ccConf.Brightness or 0,
+		Contrast = ccConf.Contrast or 0,
+		Saturation = ccConf.Saturation or 0,
+		TintColor = ccConf.TintColor and Color3.new(ccConf.TintColor.R, ccConf.TintColor.G, ccConf.TintColor.B) or Color3.new(1,1,1)
+	}
+	if fade then
+		fadeColorCorrection(0.7, 0.7, targetProps)
+	else
+		for k, v in pairs(targetProps) do cc[k] = v end
+	end
 
 	local bloomFx = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect", Lighting)
 	bloomFx.Intensity = bloom.BloomIntensity or 0.08
@@ -202,24 +240,14 @@ function RenderPlanetsFromServer(planets)
 		if lastPlanetKey ~= newPlanetKey then
 			local data = planetByKey[newPlanetKey]
 			if data then
-				-- 1. Tạo Model Mới (Trong bộ nhớ, chưa hiện ra)
 				local newModel = CreatePlanetModel(data)
-				
-				-- 2. Hiện Model Mới
 				newModel.Parent = workspace
-				
-				-- 3. Xóa Model Cũ (Nếu trùng key, ví dụ Space Version của planet này)
 				if RenderedPlanets[newPlanetKey] then
 					RenderedPlanets[newPlanetKey]:Destroy()
 				end
-				
-				-- 4. Lưu lại
 				RenderedPlanets[newPlanetKey] = newModel
-				
-				-- 5. Dọn dẹp các planet khác (Space modes)
 				clearRenderedExcept(newPlanetKey)
-				
-				applyLightingConfig(data.Bloom)
+				applyLightingConfig(data.Bloom, true) -- Fade in khi vào planet
 				applySky(data.SkyPresetName)
 			end
 			lastPlanetKey = newPlanetKey
@@ -227,24 +255,19 @@ function RenderPlanetsFromServer(planets)
 	else
 		-- TRANSITION: PLANET -> SPACE
 		if lastPlanetKey ~= "_space_" then
-			-- Xóa hết các model planet full
 			for key, model in pairs(RenderedPlanets) do
 				model:Destroy()
 				RenderedPlanets[key] = nil
 			end
-			
-			-- Render lại toàn bộ Atmosphere Only
 			for key, data in pairs(planetByKey) do
 				local m = CreateAtmosphereOnlyModel(data)
 				m.Parent = workspace
 				RenderedPlanets[key] = m
 			end
-			
-			applyLightingConfig(nil)
+			applyLightingConfig(nil, true) -- Fade out khi ra space
 			applySky(DEFAULT_SKY_NAME)
 			lastPlanetKey = "_space_"
 		else
-			-- Update view (Add missing atmospheres)
 			for key, data in pairs(planetByKey) do
 				if not RenderedPlanets[key] then
 					local m = CreateAtmosphereOnlyModel(data)
@@ -262,52 +285,52 @@ function PlanetController.Init()
 	local function HandleCharacterSpawn(char)
 		local root = char:WaitForChild("HumanoidRootPart")
 		root.Anchored = true
-		
-		local planets = nil
-		local attempts = 0
-		repeat
-			local success, data = pcall(function() return GetPlanetsRemote:InvokeServer() end)
-			if success and data and #data > 0 then planets = data else attempts += 1 task.wait(0.5) end
-		until planets or attempts >= 20
-		
-		CachedPlanets = planets or {} -- Cache ngay lập tức
 
-		local validPlanets = {}
-		if planets then
+		local function fetchPlanetsPromise(attempts)
+			attempts = attempts or 0
+			return Promise.new(function(resolve, reject)
+				local ok, data = pcall(function() return GetPlanetsRemote:InvokeServer() end)
+				if ok and data and #data > 0 then
+					resolve(data)
+				elseif attempts < 20 then
+					task.wait(0.5)
+					fetchPlanetsPromise(attempts + 1):andThen(resolve, reject)
+				else
+					reject("Failed to fetch planets after 20 attempts")
+				end
+			end)
+		end
+
+		fetchPlanetsPromise():andThen(function(planets)
+			CachedPlanets = planets or {}
+			local validPlanets = {}
 			for _, p in ipairs(planets) do
 				if p.GroundTiles and #p.GroundTiles > 0 then table.insert(validPlanets, p) end
 			end
-		end
-
-		if #validPlanets > 0 then
-			local randomPlanet = validPlanets[math.random(1, #validPlanets)]
-			local key = randomPlanet.GridPos.X .. "_" .. randomPlanet.GridPos.Y .. "_" .. randomPlanet.GridPos.Z
-			
-			if randomPlanet.WorldPos and randomPlanet.Size then
-				local radius = randomPlanet.Size / 2
-				local dropHeight = radius + 200 
-				
-				-- Teleport
-				root.CFrame = CFrame.new(randomPlanet.WorldPos.X, randomPlanet.WorldPos.Y + dropHeight, randomPlanet.WorldPos.Z)
-				
-				-- Manual Pre-render SPACE MODE (Vì đang ở ngoài)
-				if RenderedPlanets[key] then RenderedPlanets[key]:Destroy() end
-				local model = CreateAtmosphereOnlyModel(randomPlanet)
-				model.Parent = workspace
-				RenderedPlanets[key] = model
-				
-				-- Set trạng thái Space
-				AtmosphereState.InAtmosphere = false 
-				lastPlanetKey = "_space_" 
-				applyLightingConfig(nil) 
-				applySky(DEFAULT_SKY_NAME)
+			if #validPlanets > 0 then
+				local randomPlanet = validPlanets[math.random(1, #validPlanets)]
+				local key = randomPlanet.GridPos.X .. "_" .. randomPlanet.GridPos.Y .. "_" .. randomPlanet.GridPos.Z
+				if randomPlanet.WorldPos and randomPlanet.Size then
+					local radius = randomPlanet.Size / 2
+					local dropHeight = radius + 200
+					root.CFrame = CFrame.new(randomPlanet.WorldPos.X, randomPlanet.WorldPos.Y + dropHeight, randomPlanet.WorldPos.Z)
+					if RenderedPlanets[key] then RenderedPlanets[key]:Destroy() end
+					local model = CreateAtmosphereOnlyModel(randomPlanet)
+					model.Parent = workspace
+					RenderedPlanets[key] = model
+					AtmosphereState.InAtmosphere = false
+					lastPlanetKey = "_space_"
+					applyLightingConfig(nil)
+					applySky(DEFAULT_SKY_NAME)
+				end
+				task.wait(1.0)
+				root.Anchored = false
+			else
+				root.Anchored = false
 			end
-			
-			task.wait(1.0)
+		end):catch(function()
 			root.Anchored = false
-		else
-			root.Anchored = false
-		end
+		end)
 	end
 
 	local player = Players.LocalPlayer
@@ -317,21 +340,22 @@ function PlanetController.Init()
 	-- [OPTIMIZATION] NETWORK SYNC LOOP (Chậm - 0.5s)
 	task.defer(function()
 		local lastPos = Vector3.new(0, -999999, 0)
-		local UPDATE_THRESHOLD = 100 
+		local UPDATE_THRESHOLD = 100
 		while true do
 			local char = player.Character
 			local root = char and char:FindFirstChild("HumanoidRootPart")
 			if root and not root.Anchored then
 				if (root.Position - lastPos).Magnitude > UPDATE_THRESHOLD then
-					local ok, newPlanets = pcall(function() return GetPlanetsRemote:InvokeServer() end)
-					if ok and newPlanets then
-						-- Chỉ update Data Cache, không gọi Render trực tiếp ở đây để tránh xung đột
+					Promise.new(function(resolve, reject)
+						local ok, newPlanets = pcall(function() return GetPlanetsRemote:InvokeServer() end)
+						if ok and newPlanets then resolve(newPlanets) else reject() end
+					end):andThen(function(newPlanets)
 						CachedPlanets = newPlanets
 						lastPos = root.Position
-					end
+					end)
 				end
 			end
-			task.wait(0.5) 
+			task.wait(0.5)
 		end
 	end)
 

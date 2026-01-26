@@ -1,8 +1,10 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Promise = require(ReplicatedStorage.Packages.Promise)
 local PlanetService = {}
 local _planetDataCache = nil
 
 -- Configuration
-local PLANET_GRID_SPACING = 3000
+local PLANET_GRID_SPACING = 6000 -- Tăng khoảng cách giữa các planet (gấp đôi)
 local MIN_PLANET_SIZE = 500
 local MAX_PLANET_SIZE = 1500
 
@@ -189,10 +191,11 @@ end
 -- ==============================================================================
 -- INIT DATA
 -- ==============================================================================
+
 local function InitPlanetData(PlanetServiceRef)
 	if _planetDataCache then return end
 	local planets = {}
-	local MIN_DIST = 2500
+	local MIN_DIST = 5000 -- Tăng khoảng cách tối thiểu giữa các planet (gấp đôi)
 	local NUM_PLANETS = 100
 
 	local gridSize = math.ceil(NUM_PLANETS^(1/3))
@@ -249,9 +252,8 @@ function PlanetService:GetPlanetsNearPosition(position)
 
 	local nearby = {}
 	for i, data in ipairs(planets) do
-		table.insert(nearby, data) 
+		table.insert(nearby, data)
 	end
-	
 	table.sort(nearby, function(a, b)
 		local pa = Vector3.new(a.WorldPos.X, a.WorldPos.Y, a.WorldPos.Z)
 		local pb = Vector3.new(b.WorldPos.X, b.WorldPos.Y, b.WorldPos.Z)
@@ -259,23 +261,32 @@ function PlanetService:GetPlanetsNearPosition(position)
 	end)
 
 	local result = {}
-	local DETAIL_DISTANCE = 4000 
-
+	local DETAIL_DISTANCE = 4000
 	for i = 1, math.min(20, #nearby) do
 		local planetRaw = nearby[i]
-		local planetData = table.clone(planetRaw) 
-		
+		local planetData = table.clone(planetRaw)
 		local dist = (Vector3.new(planetData.WorldPos.X, planetData.WorldPos.Y, planetData.WorldPos.Z) - position).Magnitude
-		
 		if dist > DETAIL_DISTANCE then
-			planetData.Objects = nil 
-			planetData.GroundTiles = nil 
+			planetData.Objects = nil
+			planetData.GroundTiles = nil
 		end
-		
 		table.insert(result, planetData)
 	end
-
 	return result
+end
+
+-- Promise-based version for future async use
+function PlanetService:GetPlanetsNearPositionPromise(position)
+	return Promise.new(function(resolve, reject)
+		local ok, result = pcall(function()
+			return self:GetPlanetsNearPosition(position)
+		end)
+		if ok then
+			resolve(result)
+		else
+			reject(result)
+		end
+	end)
 end
 
 return PlanetService

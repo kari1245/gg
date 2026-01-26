@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 local PlanetService = require(script.Parent.PlanetService)
+local Promise = require(ReplicatedStorage.Packages.Promise)
 local GetPlanetsRemote = ReplicatedStorage:WaitForChild("GetPlanetsRemote")
 
 -- [OPTIMIZATION] Rate Limiting Config
@@ -18,25 +19,21 @@ GetPlanetsRemote.OnServerInvoke = function(player, clientSentPosition)
 	-- [OPTIMIZATION 1] Rate Limiting Check
 	local now = os.clock()
 	local lastTime = lastRequestTimes[player] or 0
-	
 	if (now - lastTime) < REQUEST_COOLDOWN then
-		-- Nếu spam quá nhanh, trả về rỗng hoặc cảnh báo nhẹ (không kick ngay để tránh false positive do lag)
-		return {} 
+		return {}
 	end
 	lastRequestTimes[player] = now
 
-	-- [OPTIMIZATION 2] Server Authority - Ignote client's 'position' argument
-	-- Server tự xác định vị trí của Player để đảm bảo tính trung thực.
+	-- [OPTIMIZATION 2] Server Authority - Ignore client's 'position' argument
 	local character = player.Character
 	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-	
 	if not rootPart then
-		-- Player chưa load xong nhân vật hoặc đã chết
 		return {}
 	end
-
 	local serverPosition = rootPart.Position
 
-	-- Gọi logic lấy Planet dựa trên vị trí THỰC TẾ của player trên server
+	-- Nếu muốn xử lý bất đồng bộ, có thể dùng Promise:
+	-- return PlanetService:GetPlanetsNearPositionPromise(serverPosition):await()
+	-- Hiện tại vẫn trả về sync để tương thích client cũ
 	return PlanetService:GetPlanetsNearPosition(serverPosition)
 end
