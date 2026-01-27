@@ -1,29 +1,31 @@
-local PlanetService = {}
-local _planetDataCache = nil
+--!strict
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
--- Configuration
-local PLANET_GRID_SPACING = 12000 -- Khoảng cách rộng
+local Knit = require(ReplicatedStorage.Packages.Knit)
+
+-- [TYPES]
+export type PlanetData = {
+	GridPos: {X: number, Y: number, Z: number},
+	WorldPos: {X: number, Y: number, Z: number},
+	Size: number,
+	Biome: {Name: string, Color: {R: number, G: number, B: number}, Emissive: number},
+	Seed: number,
+	SkyPresetName: string,
+	Bloom: {Brightness: number, BloomIntensity: number, BloomSize: number, BloomThreshold: number},
+	Objects: {any},
+	GroundTiles: {any},
+	IsHome: boolean
+}
+
+-- [CONFIGURATION]
+local PLANET_GRID_SPACING = 12000
 local MIN_PLANET_SIZE = 500
 local MAX_PLANET_SIZE = 1500
+local NUM_PLANETS = 100
+local REQUEST_COOLDOWN = 0.3
 
--- [SERVER] Dynamic Safe Height
-local DESTROY_HEIGHT = workspace.FallenPartsDestroyHeight
-if DESTROY_HEIGHT == -50000 or DESTROY_HEIGHT == 0 then DESTROY_HEIGHT = -500 end 
-local DESTROY_BUFFER = 800
-
-local function GetGridJitter(seed, amount)
-	local x = math.sin(seed) * 10000
-	return (x - math.floor(x)) * 2 * amount - amount
-end
-
-local function SeededRandom(seed, min, max)
-	local x = math.sin(seed) * 10000
-	local frac = x - math.floor(x)
-	if min and max then return min + frac * (max - min) end
-	return frac
-end
-
--- Biome Types
+-- [CONSTANTS]
 local BiomeTypes = {
 	{Name = "Desert", Color = Color3.fromRGB(232, 213, 160), Emissive = 0},
 	{Name = "Ocean", Color = Color3.fromRGB(36, 104, 160), Emissive = 0},
@@ -44,27 +46,97 @@ local BiomeTypes = {
 
 local SKY_PRESET_NAMES = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }
 
-local function PickRandomSkyName(seed)
+-- [HELPER FUNCTIONS]
+local function GetGridJitter(seed: number, amount: number): number
+	local x = math.sin(seed) * 10000
+	return (x - math.floor(x)) * 2 * amount - amount
+end
+
+local function SeededRandom(seed: number, min: number?, max: number?): number
+	local x = math.sin(seed) * 10000
+	local frac = x - math.floor(x)
+	if min and max then return min + frac * (max - min) end
+	return frac
+end
+
+local function PickRandomSkyName(seed: number): string
 	if #SKY_PRESET_NAMES == 0 then return "" end
 	local idx = math.floor(SeededRandom(seed, 1, #SKY_PRESET_NAMES + 0.99))
 	return tostring(idx)
 end
 
--- Bloom config đơn giản hóa để tiết kiệm dòng
-local function PickRandomBloomPreset(seed, biomeName)
-	-- Logic giữ nguyên, trả về table config bloom
+local function PickRandomBloomPreset(seed: number, biomeName: string)
 	return {Brightness = 1.2, BloomIntensity = 0.08, BloomSize = 24, BloomThreshold = 1.3} 
 end
 
-local function PickRandomSurfaceType(seed)
-	local types = {Enum.SurfaceType.Studs, Enum.SurfaceType.Smooth}
-	local idx = math.floor(SeededRandom(seed, 1, #types + 0.99))
-	return types[idx] or Enum.SurfaceType.Studs
+-- [SERVICE DEFINITION]
+local PlanetService = Knit.CreateService {
+	Name = "PlanetService",
+	Client = {},
+}
+
+-- Private State
+local _planetDataCache: {PlanetData} = {}
+local _lastRequestTimes: {[Player]: number} = {}
+
+function PlanetService:KnitInit()
+	print("[PlanetService] Initializing...")
+	
+	-- Pre-generate planet data
+	self:GenerateAllPlanets()
+
+	-- Cleanup cache on player leave
+	Players.PlayerRemoving:Connect(function(player)
+		_lastRequestTimes[player] = nil
+	end)
 end
 
-function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
+function PlanetService:GenerateAllPlanets()
+	if #_planetDataCache > 0 then return end
+
+	local planets = {}
+	local gridSize = math.ceil(NUM_PLANETS^(1/3))
+	local used = {}
+	local function gridKey(x, y, z) return tostring(x)..","..tostring(y)..","..tostring(z) end
+	local i = 1
+
+	-- Deterministic generation loop
+	while #planets < NUM_PLANETS do
+		local gx = ((i-1) % gridSize) - math.floor(gridSize/2)
+		local gy = (math.floor((i-1)/gridSize) % gridSize) - math.floor(gridSize/2)
+		local gz = (math.floor((i-1)/(gridSize*gridSize))) - math.floor(gridSize/2)
+
+		local key = gridKey(gx, gy, gz)
+		if not used[key] then
+			used[key] = true
+			local data = self:GeneratePlanetData(gx, gy, gz)
+			if data then table.insert(planets, data) end
+		end
+		i += 1
+		if i > gridSize^3 + 1000 then break end
+	end
+	
+	-- Fallback random generation if needed
+	while #planets < NUM_PLANETS do
+		local gx = math.random(-gridSize, gridSize)
+		local gy = math.random(-gridSize, gridSize)
+		local gz = math.random(-gridSize, gridSize)
+		local key = gridKey(gx, gy, gz)
+		if not used[key] then
+			used[key] = true
+			local data = self:GeneratePlanetData(gx, gy, gz)
+			if data then table.insert(planets, data) end
+		end
+	end
+
+	_planetDataCache = planets
+	print("[PlanetService] Planet Data Init Complete. Count:", #planets)
+end
+
+function PlanetService:GeneratePlanetData(gridX: number, gridY: number, gridZ: number): PlanetData?
 	local seed = gridX * 73856093 + gridY * 19349663 + gridZ * 83492791
 	
+	-- Calculate Positions
 	local jitterSeed = gridX*73856093 + gridY*19349663 + gridZ*83492791 + 12345
 	local jitterX = GetGridJitter(jitterSeed, PLANET_GRID_SPACING*0.25)
 	local jitterY = GetGridJitter(jitterSeed+1, PLANET_GRID_SPACING*0.25)
@@ -90,9 +162,13 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 		Z = baseZ + offsetZ
 	}
 
-	if not worldPos or not worldPos.X or not worldPos.Z or not size then return nil end
+	-- Height Safety Check
+	local DESTROY_HEIGHT = workspace.FallenPartsDestroyHeight
+	if DESTROY_HEIGHT == -50000 or DESTROY_HEIGHT == 0 then DESTROY_HEIGHT = -500 end 
+	local DESTROY_BUFFER = 800
 	if worldPos.Y - size/2 < (DESTROY_HEIGHT + DESTROY_BUFFER) then return nil end
 	
+	-- Generate Ground Tiles
 	local groundDiameter = math.min(size * 0.4, size * 0.98)
 	local tileY = 3
 	local groundY = worldPos.Y 
@@ -107,6 +183,7 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 		}
 	}
 
+	-- Generate Objects (Trees/Rocks)
 	local objects = {}
 	local groundArea = groundDiameter * groundDiameter
 	local treeDensity = math.clamp(math.floor(groundArea * 0.0012), 12, 120)
@@ -151,6 +228,7 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 		end
 	end
 
+	-- Chance to fail generation (Empty space)
 	if SeededRandom(seed) > 0.9 then return nil end
 
 	return {
@@ -167,52 +245,26 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 	}
 end
 
-local function InitPlanetData(PlanetServiceRef)
-	if _planetDataCache then return end
-	local planets = {}
-	local NUM_PLANETS = 100
-	local gridSize = math.ceil(NUM_PLANETS^(1/3))
-	local used = {}
-	local function gridKey(x, y, z) return tostring(x)..","..tostring(y)..","..tostring(z) end
-	local i = 1
-
-	while #planets < NUM_PLANETS do
-		local gx = ((i-1) % gridSize) - math.floor(gridSize/2)
-		local gy = (math.floor((i-1)/gridSize) % gridSize) - math.floor(gridSize/2)
-		local gz = (math.floor((i-1)/(gridSize*gridSize))) - math.floor(gridSize/2)
-		
-		local key = gridKey(gx, gy, gz)
-		if not used[key] then
-			used[key] = true
-			local data = PlanetServiceRef:GeneratePlanetData(gx, gy, gz)
-			if data then table.insert(planets, data) end
-		end
-		i = i + 1
-		if i > gridSize^3 + 1000 then break end
+-- [CLIENT METHODS]
+function PlanetService.Client:GetPlanetsNearPosition(player: Player): {PlanetData}
+	-- Rate Limiting
+	local now = os.clock()
+	local lastTime = _lastRequestTimes[player] or 0
+	if (now - lastTime) < REQUEST_COOLDOWN then
+		return {} -- Return empty if spamming
 	end
+	_lastRequestTimes[player] = now
+
+	-- Server Authority Position
+	local character = player.Character
+	local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then return {} end
 	
-	while #planets < NUM_PLANETS do
-		local gx = math.random(-gridSize, gridSize)
-		local gy = math.random(-gridSize, gridSize)
-		local gz = math.random(-gridSize, gridSize)
-		local key = gridKey(gx, gy, gz)
-		if not used[key] then
-			used[key] = true
-			local data = PlanetServiceRef:GeneratePlanetData(gx, gy, gz)
-			if data then table.insert(planets, data) end
-		end
-	end
-	_planetDataCache = planets
-	print("[SERVER] Planet Data Init Complete. Count:", #planets)
-end
-
-function PlanetService:GetPlanetsNearPosition(position)
-	InitPlanetData(self)
-	local planets = _planetDataCache or {}
-	if #planets == 0 then return {} end
-
+	local position = (rootPart :: BasePart).Position
+	
+	-- Sort planets by distance
 	local nearby = {}
-	for i, data in ipairs(planets) do
+	for i, data in ipairs(_planetDataCache) do
 		table.insert(nearby, data) 
 	end
 	
@@ -222,8 +274,7 @@ function PlanetService:GetPlanetsNearPosition(position)
 		return (pa - position).Magnitude < (pb - position).Magnitude
 	end)
 
-	-- [REMOVED LOD] Gửi Full Data của 20 hành tinh gần nhất
-	-- Không còn kiểm tra khoảng cách DETAIL_DISTANCE nữa
+	-- Return closest 20
 	local result = {}
 	for i = 1, math.min(20, #nearby) do
 		table.insert(result, nearby[i])
