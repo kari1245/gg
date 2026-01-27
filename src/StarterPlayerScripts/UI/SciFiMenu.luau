@@ -1,151 +1,124 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
 local SciFiMenu = {}
 
 local COLORS = {
 	SLATE_900 = Color3.fromRGB(15, 23, 42),
-	SLATE_800 = Color3.fromRGB(30, 41, 59),
 	SLATE_700 = Color3.fromRGB(51, 65, 85),
 	CYAN_400 = Color3.fromRGB(34, 211, 238),
-	CYAN_900 = Color3.fromRGB(22, 78, 99),
 	WHITE = Color3.fromRGB(255, 255, 255),
 	TEXT_GRAY = Color3.fromRGB(148, 163, 184)
 }
 
+-- Private Helper: Tạo Tab
 local function CreateTab(labelName, parent, onClick)
 	local btn = Instance.new("TextButton")
 	btn.Name = labelName
-	btn.Size = UDim2.fromScale(1, 0.1)
-	btn.BackgroundColor3 = COLORS.SLATE_900
+	btn.Size = UDim2.fromScale(1, 0.12)
 	btn.BackgroundTransparency = 1
-	btn.AutoButtonColor = false
+	btn.Text = ""
 	btn.Parent = parent
-
-	local layout = Instance.new("UIListLayout")
-	layout.FillDirection = Enum.FillDirection.Horizontal
-	layout.Padding = UDim.new(0.02, 0)
-	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.Parent = btn
-	
-	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0.05, 0)
-	padding.Parent = btn
-
-	local indicator = Instance.new("Frame")
-	indicator.Size = UDim2.fromScale(0.1, 0.4)
-	indicator.SizeConstraint = Enum.SizeConstraint.RelativeYY
-	indicator.BackgroundColor3 = COLORS.TEXT_GRAY
-	indicator.Parent = btn
 
 	local text = Instance.new("TextLabel")
 	text.Text = labelName
 	text.Font = Enum.Font.Code
-	text.TextScaled = true
+	text.TextSize = 18
 	text.TextColor3 = COLORS.TEXT_GRAY
+	text.Size = UDim2.fromScale(1, 1)
 	text.BackgroundTransparency = 1
-	text.Size = UDim2.fromScale(0.7, 0.5)
 	text.Parent = btn
-	
-	local activeBar = Instance.new("Frame")
-	activeBar.Size = UDim2.fromScale(0.02, 1)
-	activeBar.BackgroundColor3 = COLORS.CYAN_400
-	activeBar.Visible = false
-	activeBar.Parent = btn
 
-	-- Logic
 	btn.MouseButton1Click:Connect(onClick)
 	
-	-- Return object to manipulate later
 	return {
-		Instance = btn,
 		SetActive = function(isActive)
-			activeBar.Visible = isActive
 			text.TextColor3 = isActive and COLORS.CYAN_400 or COLORS.TEXT_GRAY
-			indicator.BackgroundColor3 = isActive and COLORS.CYAN_400 or COLORS.TEXT_GRAY
-			btn.BackgroundTransparency = isActive and 0.7 or 1
+			text.Font = isActive and Enum.Font.GothamBold or Enum.Font.Code
 		end
 	}
 end
 
-function SciFiMenu.New()
+function SciFiMenu.Mount()
+	local player = Players.LocalPlayer
+	local playerGui = player:WaitForChild("PlayerGui")
+
+	-- 1. Setup ScreenGui
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "SciFiMenu"
 	screenGui.ResetOnSpawn = false
+	screenGui.Enabled = false -- Ẩn mặc định
 	screenGui.DisplayOrder = 10
+	screenGui.Parent = playerGui
 
-	local mainContainer = Instance.new("Frame")
-	mainContainer.Name = "MainContainer"
-	mainContainer.Size = UDim2.fromScale(0.8, 0.8)
-	mainContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-	mainContainer.Position = UDim2.fromScale(0.5, 0.5)
-	mainContainer.BackgroundColor3 = COLORS.SLATE_900
-	mainContainer.BorderSizePixel = 2
-	mainContainer.BorderColor3 = COLORS.SLATE_700
-	mainContainer.Parent = screenGui
+	-- 2. Main Container
+	local container = Instance.new("Frame")
+	container.Size = UDim2.fromScale(0.6, 0.7)
+	container.AnchorPoint = Vector2.new(0.5, 0.5)
+	container.Position = UDim2.fromScale(0.5, 0.5)
+	container.BackgroundColor3 = COLORS.SLATE_900
+	container.BorderSizePixel = 2
+	container.BorderColor3 = COLORS.CYAN_400
+	container.Parent = screenGui
 
 	-- Sidebar
 	local sidebar = Instance.new("Frame")
-	sidebar.Name = "Sidebar"
 	sidebar.Size = UDim2.fromScale(0.25, 1)
 	sidebar.BackgroundColor3 = COLORS.SLATE_900
-	sidebar.BackgroundTransparency = 0.5
 	sidebar.BorderColor3 = COLORS.SLATE_700
-	sidebar.BorderSizePixel = 1
-	sidebar.Parent = mainContainer
+	sidebar.Parent = container
 
-	local listLayout = Instance.new("UIListLayout")
-	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	listLayout.Parent = sidebar
-
-	-- Logo
-	local logoArea = Instance.new("Frame")
-	logoArea.Size = UDim2.fromScale(1, 0.15)
-	logoArea.BackgroundTransparency = 1
-	logoArea.Parent = sidebar
+	local list = Instance.new("UIListLayout")
+	list.Padding = UDim.new(0, 5)
+	list.Parent = sidebar
 	
-	local logoText = Instance.new("TextLabel")
-	logoText.Text = "NEOBLOX"
-	logoText.TextColor3 = COLORS.WHITE
-	logoText.Font = Enum.Font.SciFi
-	logoText.TextScaled = true
-	logoText.Size = UDim2.fromScale(0.8, 0.5)
-	logoText.Position = UDim2.fromScale(0.1, 0.25)
-	logoText.BackgroundTransparency = 1
-	logoText.Parent = logoArea
+	-- Padding top cho sidebar
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0, 20)
+	pad.Parent = sidebar
 
 	-- Content Area
 	local content = Instance.new("Frame")
-	content.Name = "Content"
 	content.Size = UDim2.fromScale(0.75, 1)
 	content.Position = UDim2.fromScale(0.25, 0)
 	content.BackgroundTransparency = 1
-	content.Parent = mainContainer
+	content.Parent = container
 	
-	local header = Instance.new("TextLabel")
-	header.Text = "DEPLOY"
-	header.Font = Enum.Font.Code
-	header.TextScaled = true
-	header.TextColor3 = COLORS.WHITE
-	header.TextXAlignment = Enum.TextXAlignment.Left
-	header.Size = UDim2.fromScale(1, 0.1)
-	header.BackgroundTransparency = 1
-	header.Position = UDim2.fromScale(0.05, 0.05)
-	header.Parent = content
+	local title = Instance.new("TextLabel")
+	title.Text = "SYSTEM READY"
+	title.TextColor3 = COLORS.WHITE
+	title.Font = Enum.Font.SciFi
+	title.TextSize = 30
+	title.Size = UDim2.fromScale(1, 0.15)
+	title.BackgroundTransparency = 1
+	title.Parent = content
 
-	-- Tabs Logic
+	-- Logic Tabs
 	local tabs = {}
 	local function SetTab(name)
-		header.Text = name
-		for tName, tabObj in pairs(tabs) do
-			tabObj.SetActive(tName == name)
+		title.Text = "> " .. name
+		for tName, tObj in pairs(tabs) do
+			tObj.SetActive(tName == name)
 		end
 	end
 
 	tabs["DEPLOY"] = CreateTab("DEPLOY", sidebar, function() SetTab("DEPLOY") end)
-	tabs["LOADOUT"] = CreateTab("LOADOUT", sidebar, function() SetTab("LOADOUT") end)
-	tabs["CHARACTER"] = CreateTab("CHARACTER", sidebar, function() SetTab("CHARACTER") end)
-
+	tabs["SETTINGS"] = CreateTab("SETTINGS", sidebar, function() SetTab("SETTINGS") end)
+	
 	SetTab("DEPLOY") -- Default
 
-	return screenGui
+	-- API Object
+	local api = {}
+	
+	function api.SetVisible(visible)
+		screenGui.Enabled = visible
+	end
+	
+	function api.Toggle()
+		screenGui.Enabled = not screenGui.Enabled
+	end
+	
+	return api
 end
 
 return SciFiMenu
