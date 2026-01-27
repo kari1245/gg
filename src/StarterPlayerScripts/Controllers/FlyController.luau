@@ -1,9 +1,10 @@
---!strict
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Knit = require(ReplicatedStorage.Packages.Knit)
+
+-- [FIX 1] Cast Knit to any to prevent 'KnitServer' inference on client
+local Knit = require(ReplicatedStorage.Packages.Knit) :: any
 
 local FlyController = Knit.CreateController { Name = "FlyController" }
 
@@ -14,10 +15,10 @@ local FAST_SPEED = 400
 -- State
 local _isFlying = false
 local _speed = NORMAL_SPEED
-local _moveKeys = {}
+local _moveKeys: {[Enum.KeyCode]: Vector3} = {}
 local _bodyVelocity: BodyVelocity? = nil
 
-local KEY_MAP = {
+local KEY_MAP: {[Enum.KeyCode]: Vector3} = {
 	[Enum.KeyCode.W] = Vector3.new(0, 0, 1),
 	[Enum.KeyCode.S] = Vector3.new(0, 0, -1),
 	[Enum.KeyCode.A] = Vector3.new(-1, 0, 0),

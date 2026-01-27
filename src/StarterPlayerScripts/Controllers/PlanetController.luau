@@ -1,18 +1,59 @@
---!strict
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local Knit = require(ReplicatedStorage.Packages.Knit)
+-- [FIX 1] Cast Knit to any to prevent 'KnitServer' inference on client
+local Knit = require(ReplicatedStorage.Packages.Knit) :: any
 local Promise = require(ReplicatedStorage.Packages.Promise)
+
+-- [TYPES]
+type PlanetData = {
+	GridPos: {X: number, Y: number, Z: number},
+	WorldPos: {X: number, Y: number, Z: number},
+	Size: number,
+	Biome: {Name: string, Color: {R: number, G: number, B: number}, Emissive: number},
+	Seed: number,
+	SkyPresetName: string,
+	Bloom: {Brightness: number?, BloomIntensity: number?, BloomSize: number?, BloomThreshold: number?, Intensity: number?, Size: number?, Threshold: number?},
+	Objects: {any},
+	GroundTiles: {any},
+	IsHome: boolean
+}
+
+type ColorCorrectionConfig = {
+	Brightness: number?, 
+	Contrast: number?, 
+	Saturation: number?, 
+	TintColor: Color3?
+}
+
+type BloomConfig = {
+	Intensity: number?, 
+	Size: number?, 
+	Threshold: number?, 
+	BloomIntensity: number?, 
+	BloomSize: number?, 
+	BloomThreshold: number?
+}
+
+type LightingConfig = {
+	Brightness: number?,
+	Ambient: Color3?,
+	OutdoorAmbient: Color3?,
+	EnvironmentDiffuseScale: number?,
+	EnvironmentSpecularScale: number?,
+	Bloom: BloomConfig?,
+	ColorCorrection: ColorCorrectionConfig?
+}
 
 -- [CONSTANTS]
 local UPDATE_THRESHOLD = 100 
 local TWEEN_INFO_LIGHTING = TweenInfo.new(2.0, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 local DEFAULT_SKY_NAME = "Space"
-local DEFAULT_LIGHTING = {
+
+local DEFAULT_LIGHTING: LightingConfig = {
 	Brightness = 1.5,
 	Ambient = Color3.fromRGB(10,10,20),
 	OutdoorAmbient = Color3.fromRGB(20,20,30),
@@ -28,14 +69,14 @@ local PlanetController = Knit.CreateController { Name = "PlanetController" }
 -- [STATE]
 local RenderedPlanets = {}
 local AtmosphereState = { InAtmosphere = false, CurrentPlanetKey = nil }
-local CachedPlanets = {} 
+local CachedPlanets: {PlanetData} = {} 
 
 local currentFetchPromise = nil
 local activeLightingTweens = {}
 local lastPlanetKey = nil
 
 -- [HELPER FUNCTIONS]
-local function toColor(t)
+local function toColor(t: any): Color3
 	if typeof(t) == "Color3" then return t end
 	return Color3.new(t.R, t.G, t.B)
 end
@@ -47,13 +88,13 @@ local function cancelActiveTweens()
 	activeLightingTweens = {}
 end
 
-local function tweenProperty(instance, properties)
+local function tweenProperty(instance: Instance, properties: {[string]: any})
 	local tween = TweenService:Create(instance, TWEEN_INFO_LIGHTING, properties)
 	table.insert(activeLightingTweens, tween)
 	tween:Play()
 end
 
-local function UpdateLightingEffects(targetConfig)
+local function UpdateLightingEffects(targetConfig: LightingConfig)
 	cancelActiveTweens()
 	tweenProperty(Lighting, {
 		Brightness = targetConfig.Brightness or DEFAULT_LIGHTING.Brightness,
@@ -62,16 +103,23 @@ local function UpdateLightingEffects(targetConfig)
 		EnvironmentDiffuseScale = targetConfig.EnvironmentDiffuseScale or DEFAULT_LIGHTING.EnvironmentDiffuseScale,
 		EnvironmentSpecularScale = targetConfig.EnvironmentSpecularScale or DEFAULT_LIGHTING.EnvironmentSpecularScale
 	})
+	
 	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect", Lighting)
-	local ccConf = targetConfig.ColorCorrection or DEFAULT_LIGHTING.ColorCorrection
+	
+	-- [FIX 2] Explicitly type ccConf so 'or {}' is treated as ColorCorrectionConfig (valid because fields are optional)
+	local ccConf: ColorCorrectionConfig = targetConfig.ColorCorrection or DEFAULT_LIGHTING.ColorCorrection or {}
+	
 	tweenProperty(cc, {
 		Brightness = ccConf.Brightness or 0,
 		Contrast = ccConf.Contrast or 0,
 		Saturation = ccConf.Saturation or 0,
 		TintColor = ccConf.TintColor and toColor(ccConf.TintColor) or Color3.new(1,1,1)
 	})
+	
 	local bloomFx = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect", Lighting)
-	local bloomConf = targetConfig.Bloom or DEFAULT_LIGHTING.Bloom
+	-- [FIX 3] Cast to 'any' to handle the mix of custom keys (BloomIntensity) and Roblox keys (Intensity)
+	local bloomConf: any = targetConfig.Bloom or DEFAULT_LIGHTING.Bloom or {}
+	
 	tweenProperty(bloomFx, {
 		Intensity = bloomConf.Intensity or bloomConf.BloomIntensity or 0,
 		Size = bloomConf.Size or bloomConf.BloomSize or 0,
@@ -79,7 +127,7 @@ local function UpdateLightingEffects(targetConfig)
 	})
 end
 
-local function applySky(skyName)
+local function applySky(skyName: string?)
 	local currentSky = Lighting:FindFirstChildOfClass("Sky")
 	if currentSky and currentSky.Name == skyName then return end
 	
@@ -100,7 +148,7 @@ local function applySky(skyName)
 end
 
 -- [MODEL CREATION]
-local function CreateAtmosphereOnlyModel(data)
+local function CreateAtmosphereOnlyModel(data: PlanetData)
 	local model = Instance.new("Model")
 	model.Name = "PlanetAtmosphere_" .. data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
 	
@@ -119,7 +167,7 @@ local function CreateAtmosphereOnlyModel(data)
 	return model
 end
 
-local function CreatePlanetModel(data)
+local function CreatePlanetModel(data: PlanetData)
 	local model = Instance.new("Model")
 	model.Name = "Planet_" .. data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
 	
@@ -202,7 +250,7 @@ function PlanetController:KnitStart()
 		local lastPos = Vector3.new(0, -999999, 0)
 		while true do
 			local char = player.Character
-			local root = char and char:FindFirstChild("HumanoidRootPart")
+			local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart
 			if root and not root.Anchored then
 				if (root.Position - lastPos).Magnitude > UPDATE_THRESHOLD then
 					self:FetchPlanetsFromServer():andThen(function(newPlanets)
@@ -276,13 +324,13 @@ function PlanetController:HandleCharacterSpawn(char)
 			root.Anchored = false
 		end
 	end)
-	:catch(function(err) warn(err) root.Anchored = false end)
+	:catch(function(err) warn(err); root.Anchored = false end)
 end
 
-function PlanetController:RenderPlanets(planets)
+function PlanetController:RenderPlanets(planets: {PlanetData})
 	local player = Players.LocalPlayer
 	local char = player.Character
-	local root = char and char:FindFirstChild("HumanoidRootPart")
+	local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart
 	if not root then return end
 	
 	local playerPos = root.Position
@@ -316,7 +364,7 @@ function PlanetController:RenderPlanets(planets)
 					end
 				end
 				
-				local targetConfig = { Bloom = data.Bloom }
+				local targetConfig: LightingConfig = { Bloom = data.Bloom }
 				UpdateLightingEffects(targetConfig)
 				applySky(data.SkyPresetName)
 			end
@@ -326,7 +374,9 @@ function PlanetController:RenderPlanets(planets)
 		-- STATE: SPACE (ATMOSPHERE ORB RENDER)
 		if lastPlanetKey ~= "_space_" then
 			-- Switch to space mode: clear everything, render only orbs
-			for key, model in pairs(RenderedPlanets) do model:Destroy() RenderedPlanets[key] = nil end
+			for key, model in pairs(RenderedPlanets) do 
+				model:Destroy(); RenderedPlanets[key] = nil 
+			end
 			for key, data in pairs(planetByKey) do
 				local m = CreateAtmosphereOnlyModel(data)
 				m.Parent = workspace
@@ -349,11 +399,11 @@ function PlanetController:RenderPlanets(planets)
 end
 
 -- [INTERNAL HELPERS]
-function PlanetController:_GetPlanetKey(data)
+function PlanetController:_GetPlanetKey(data: PlanetData)
 	return data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
 end
 
-function PlanetController:_GetCurrentPlanetInAtmosphere(planets, playerPos)
+function PlanetController:_GetCurrentPlanetInAtmosphere(planets: {PlanetData}, playerPos: Vector3)
 	local nearest = nil
 	local minDst = math.huge
 	for _, data in ipairs(planets) do

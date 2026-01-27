@@ -1,9 +1,8 @@
---!strict
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local Knit = require(ReplicatedStorage.Packages.Knit)
+local Knit = require(ReplicatedStorage.Packages.Knit) :: any
 local Fusion = require(ReplicatedStorage.Packages.Fusion)
 
 local peek = Fusion.peek
