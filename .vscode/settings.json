@@ -1,6 +1,1 @@
-{
-    "luau-lsp.plugin.enabled": true,
-    "luau-lsp.sourcemap.enabled": true,
-    "luau-lsp.sourcemap.autogenerate": false,
-    "luau-lsp.sourcemap.includeNonScripts": false
-}
+{}

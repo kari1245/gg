@@ -6,12 +6,3 @@ realm = "shared"
 private = true
 
 [dependencies]
-# Core Framework
-Knit = "sleitnick/knit@1.7.0"
-# Utilities
-Promise = "evaera/promise@4.0.0"
-Signal = "sleitnick/signal@2.0.1"
-Janitor = "howmanysmall/janitor@1.16.0" # Recommended for cleanup
-TableUtil = "sleitnick/table-util@1.2.1"
-# UI
-Fusion = "dphfox/fusion@0.3.0" # Based on your usage of 'scoped' and 'peek'
