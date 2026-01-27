@@ -3,57 +3,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local ContentProvider = game:GetService("ContentProvider")
 
--- [FIX 1] Cast Knit to any to prevent 'KnitServer' inference on client
 local Knit = require(ReplicatedStorage.Packages.Knit) :: any
 local Promise = require(ReplicatedStorage.Packages.Promise)
-
--- [TYPES]
-type PlanetData = {
-	GridPos: {X: number, Y: number, Z: number},
-	WorldPos: {X: number, Y: number, Z: number},
-	Size: number,
-	Biome: {Name: string, Color: {R: number, G: number, B: number}, Emissive: number},
-	Seed: number,
-	SkyPresetName: string,
-	Bloom: {Brightness: number?, BloomIntensity: number?, BloomSize: number?, BloomThreshold: number?, Intensity: number?, Size: number?, Threshold: number?},
-	Objects: {any},
-	GroundTiles: {any},
-	IsHome: boolean
-}
-
-type ColorCorrectionConfig = {
-	Brightness: number?, 
-	Contrast: number?, 
-	Saturation: number?, 
-	TintColor: Color3?
-}
-
-type BloomConfig = {
-	Intensity: number?, 
-	Size: number?, 
-	Threshold: number?, 
-	BloomIntensity: number?, 
-	BloomSize: number?, 
-	BloomThreshold: number?
-}
-
-type LightingConfig = {
-	Brightness: number?,
-	Ambient: Color3?,
-	OutdoorAmbient: Color3?,
-	EnvironmentDiffuseScale: number?,
-	EnvironmentSpecularScale: number?,
-	Bloom: BloomConfig?,
-	ColorCorrection: ColorCorrectionConfig?
-}
+local PlanetMath = require(ReplicatedStorage.Common.PlanetMath)
+local ObjectPool = require(ReplicatedStorage.Common.ObjectPool)
 
 -- [CONSTANTS]
 local UPDATE_THRESHOLD = 100 
 local TWEEN_INFO_LIGHTING = TweenInfo.new(2.0, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 local DEFAULT_SKY_NAME = "Space"
 
-local DEFAULT_LIGHTING: LightingConfig = {
+local DEFAULT_LIGHTING = {
 	Brightness = 1.5,
 	Ambient = Color3.fromRGB(10,10,20),
 	OutdoorAmbient = Color3.fromRGB(20,20,30),
@@ -69,14 +31,16 @@ local PlanetController = Knit.CreateController { Name = "PlanetController" }
 -- [STATE]
 local RenderedPlanets = {}
 local AtmosphereState = { InAtmosphere = false, CurrentPlanetKey = nil }
-local CachedPlanets: {PlanetData} = {} 
-
+local CachedPlanets = {} 
 local currentFetchPromise = nil
 local activeLightingTweens = {}
 local lastPlanetKey = nil
 
+-- [POOLS]
+local Pools = {} 
+
 -- [HELPER FUNCTIONS]
-local function toColor(t: any): Color3
+local function toColor(t)
 	if typeof(t) == "Color3" then return t end
 	return Color3.new(t.R, t.G, t.B)
 end
@@ -88,13 +52,13 @@ local function cancelActiveTweens()
 	activeLightingTweens = {}
 end
 
-local function tweenProperty(instance: Instance, properties: {[string]: any})
+local function tweenProperty(instance, properties)
 	local tween = TweenService:Create(instance, TWEEN_INFO_LIGHTING, properties)
 	table.insert(activeLightingTweens, tween)
 	tween:Play()
 end
 
-local function UpdateLightingEffects(targetConfig: LightingConfig)
+local function UpdateLightingEffects(targetConfig)
 	cancelActiveTweens()
 	tweenProperty(Lighting, {
 		Brightness = targetConfig.Brightness or DEFAULT_LIGHTING.Brightness,
@@ -105,10 +69,7 @@ local function UpdateLightingEffects(targetConfig: LightingConfig)
 	})
 	
 	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect", Lighting)
-	
-	-- [FIX 2] Explicitly type ccConf so 'or {}' is treated as ColorCorrectionConfig (valid because fields are optional)
-	local ccConf: ColorCorrectionConfig = targetConfig.ColorCorrection or DEFAULT_LIGHTING.ColorCorrection or {}
-	
+	local ccConf = targetConfig.ColorCorrection or DEFAULT_LIGHTING.ColorCorrection or {}
 	tweenProperty(cc, {
 		Brightness = ccConf.Brightness or 0,
 		Contrast = ccConf.Contrast or 0,
@@ -117,9 +78,7 @@ local function UpdateLightingEffects(targetConfig: LightingConfig)
 	})
 	
 	local bloomFx = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect", Lighting)
-	-- [FIX 3] Cast to 'any' to handle the mix of custom keys (BloomIntensity) and Roblox keys (Intensity)
-	local bloomConf: any = targetConfig.Bloom or DEFAULT_LIGHTING.Bloom or {}
-	
+	local bloomConf = targetConfig.Bloom or DEFAULT_LIGHTING.Bloom or {}
 	tweenProperty(bloomFx, {
 		Intensity = bloomConf.Intensity or bloomConf.BloomIntensity or 0,
 		Size = bloomConf.Size or bloomConf.BloomSize or 0,
@@ -127,11 +86,10 @@ local function UpdateLightingEffects(targetConfig: LightingConfig)
 	})
 end
 
-local function applySky(skyName: string?)
+local function applySky(skyName)
 	local currentSky = Lighting:FindFirstChildOfClass("Sky")
 	if currentSky and currentSky.Name == skyName then return end
 	
-	-- Clear old sky
 	for _, obj in ipairs(Lighting:GetChildren()) do 
 		if obj:IsA("Sky") then obj:Destroy() end 
 	end
@@ -147,8 +105,45 @@ local function applySky(skyName: string?)
 	end
 end
 
--- [MODEL CREATION]
-local function CreateAtmosphereOnlyModel(data: PlanetData)
+-- [ASSET SYSTEM - CORRECTED PATH]
+function PlanetController:SetupPools()
+	-- Cấu hình: Folder nằm trực tiếp trong ReplicatedStorage
+	local categories = {
+		{FolderName = "Trees", Type = "Tree"},
+		{FolderName = "Rocks", Type = "Rock"}
+	}
+	
+	local assetsToPreload = {}
+
+	for _, cat in ipairs(categories) do
+		-- [FIX] Tìm trực tiếp trong ReplicatedStorage
+		local folder = ReplicatedStorage:FindFirstChild(cat.FolderName)
+		
+		if folder then
+			for _, model in ipairs(folder:GetChildren()) do
+				-- Key duy nhất: "Tree_1", "Tree_2", "Rock_1", ...
+				local poolKey = cat.Type .. "_" .. model.Name 
+				
+				-- Tạo Pool (30 objects mỗi loại)
+				Pools[poolKey] = ObjectPool.new(model, 30)
+				table.insert(assetsToPreload, model)
+				print("[PlanetController] Pool Ready:", poolKey)
+			end
+		else
+			warn("[PlanetController] Missing folder in ReplicatedStorage:", cat.FolderName)
+		end
+	end
+
+	-- Preload assets thật
+	if #assetsToPreload > 0 then
+		task.spawn(function()
+			pcall(function() ContentProvider:PreloadAsync(assetsToPreload) end)
+		end)
+	end
+end
+
+-- [RENDER LOGIC]
+local function CreateAtmosphereOnlyModel(data)
 	local model = Instance.new("Model")
 	model.Name = "PlanetAtmosphere_" .. data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
 	
@@ -167,10 +162,11 @@ local function CreateAtmosphereOnlyModel(data: PlanetData)
 	return model
 end
 
-local function CreatePlanetModel(data: PlanetData)
+function PlanetController:CreatePlanetModel(data)
 	local model = Instance.new("Model")
 	model.Name = "Planet_" .. data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
 	
+	-- Core & Atmosphere
 	local atmosphere = Instance.new("Part")
 	atmosphere.Name = "Atmosphere"
 	atmosphere.Size = Vector3.new(data.Size, data.Size, data.Size)
@@ -184,68 +180,90 @@ local function CreatePlanetModel(data: PlanetData)
 	pcall(function() atmosphere.LocalTransparencyModifier = 0 end)
 	atmosphere.Parent = model
 
+	-- Ground
 	local groundFolder = Instance.new("Folder", model)
 	groundFolder.Name = "GroundTiles"
-	if data.GroundTiles then
-		for _, tileData in ipairs(data.GroundTiles) do
-			local tile = Instance.new("Part")
-			tile.Name = "Tile"
-			tile.Anchored = true
-			tile.Material = Enum.Material.Plastic
-			tile.Size = Vector3.new(tileData.Size.X, tileData.Size.Y, tileData.Size.Z)
-			tile.Position = Vector3.new(tileData.Position.X, tileData.Position.Y, tileData.Position.Z)
-			tile.Color = Color3.new(tileData.Color.R, tileData.Color.G, tileData.Color.B)
-			tile.TopSurface = tileData.TopSurface == "Studs" and Enum.SurfaceType.Studs or Enum.SurfaceType.Smooth
-			tile.BottomSurface = tileData.BottomSurface == "Studs" and Enum.SurfaceType.Studs or Enum.SurfaceType.Smooth
-			tile.Parent = groundFolder
-		end
-	end
+	local tileY = 3
+	local groundDiameter = math.min(data.Size * 0.4, data.Size * 0.98)
+	local tile = Instance.new("Part")
+	tile.Name = "CoreTile"
+	tile.Anchored = true
+	tile.Material = Enum.Material.Plastic
+	tile.Size = Vector3.new(groundDiameter, tileY, groundDiameter)
+	tile.Position = Vector3.new(data.WorldPos.X, data.WorldPos.Y, data.WorldPos.Z)
+	tile.Color = Color3.new(data.Biome.Color.R, data.Biome.Color.G, data.Biome.Color.B)
+	tile.TopSurface = Enum.SurfaceType.Studs
+	tile.Parent = groundFolder
 
+	-- OBJECTS GENERATION (CORRECT KEY LOOKUP)
 	local objectsFolder = Instance.new("Folder", model)
 	objectsFolder.Name = "Objects"
-	local treesFolder = ReplicatedStorage:FindFirstChild("Trees")
-	local rocksFolder = ReplicatedStorage:FindFirstChild("Rocks")
-	if data.Objects then
-		for _, obj in ipairs(data.Objects) do
-			local template = nil
-			if obj.Type == "Tree" and treesFolder then template = treesFolder:FindFirstChild(obj.Model) end
-			if obj.Type == "Rock" and rocksFolder then template = rocksFolder:FindFirstChild(obj.Model) end
-			
-			local clone
-			if template then
-				clone = template:Clone()
-			else
-				clone = Instance.new("Part")
-				clone.Size = Vector3.new(8, 16, 8)
-				clone.Color = obj.Type == "Tree" and Color3.fromRGB(34, 139, 34) or Color3.fromRGB(120, 120, 120)
+	
+	local objectsData = PlanetMath.GenerateVegetationData(data.Seed, data.Size, Vector3.new(data.WorldPos.X, data.WorldPos.Y, data.WorldPos.Z))
+	
+	for _, obj in ipairs(objectsData) do
+		-- Logic: obj.Type="Tree", obj.Model="1" -> Key="Tree_1"
+		local poolKey = obj.Type .. "_" .. obj.Model 
+		local pool = Pools[poolKey]
+		
+		-- Fallback: Nếu không tìm thấy Tree_5, thử tìm Tree_1
+		if not pool then
+			pool = Pools[obj.Type .. "_1"] 
+		end
+		
+		if pool then
+			local item = pool:Get()
+			if item then
+				local cf = CFrame.new(obj.PosX, obj.PosY, obj.PosZ) * CFrame.Angles(0, math.rad(obj.RotY or 0), 0)
+				
+				if item:IsA("Model") then
+					item:PivotTo(cf)
+					if obj.Scale and item.PrimaryPart then
+						item:ScaleTo(obj.Scale)
+					end
+				else
+					item.CFrame = cf * CFrame.new(0, item.Size.Y/2, 0)
+				end
+				
+				-- Lưu key để trả về đúng kho khi unload
+				item:SetAttribute("PoolType", poolKey)
+				item.Parent = objectsFolder
 			end
-			clone.Name = obj.Type
-			
-			local cf = CFrame.new(obj.PosX, obj.PosY, obj.PosZ) * CFrame.Angles(0, math.rad(obj.RotY or 0), 0)
-			
-			if clone:IsA("Model") then
-				clone:PivotTo(cf)
-			else
-				clone.CFrame = cf * CFrame.new(0, clone.Size.Y/2, 0)
-			end
-			clone.Parent = objectsFolder
 		end
 	end
+	
 	return model
 end
 
--- [CORE LOGIC]
-function PlanetController:KnitStart()
-	print("[PlanetController] Started")
-	self.PlanetService = Knit.GetService("PlanetService")
+function PlanetController:UnloadPlanet(key)
+	local model = RenderedPlanets[key]
+	if not model then return end
 	
+	local objectsFolder = model:FindFirstChild("Objects")
+	if objectsFolder then
+		for _, item in ipairs(objectsFolder:GetChildren()) do
+			local poolKey = item:GetAttribute("PoolType")
+			if poolKey and Pools[poolKey] then
+				Pools[poolKey]:Return(item)
+			else
+				item:Destroy()
+			end
+		end
+	end
+	model:Destroy()
+	RenderedPlanets[key] = nil
+end
+
+function PlanetController:KnitStart()
+	print("[PlanetController] Started - Direct RepStorage Access")
+	self:SetupPools()
+	
+	self.PlanetService = Knit.GetService("PlanetService")
 	local player = Players.LocalPlayer
 	
-	-- Handle initial spawn
 	if player.Character then self:HandleCharacterSpawn(player.Character) end
 	player.CharacterAdded:Connect(function(char) self:HandleCharacterSpawn(char) end)
 
-	-- Network Fetch Loop
 	task.spawn(function()
 		local lastPos = Vector3.new(0, -999999, 0)
 		while true do
@@ -263,7 +281,6 @@ function PlanetController:KnitStart()
 		end
 	end)
 
-	-- Render Loop
 	RunService.Heartbeat:Connect(function()
 		if CachedPlanets and #CachedPlanets > 0 then
 			self:RenderPlanets(CachedPlanets)
@@ -273,12 +290,9 @@ end
 
 function PlanetController:FetchPlanetsFromServer()
 	if currentFetchPromise then currentFetchPromise:cancel() end
-	
 	currentFetchPromise = Promise.new(function(resolve, reject)
-		-- Using Knit Service Method instead of RemoteFunction
 		self.PlanetService:GetPlanetsNearPosition():andThen(resolve):catch(reject)
 	end)
-	
 	return currentFetchPromise
 end
 
@@ -301,11 +315,10 @@ function PlanetController:HandleCharacterSpawn(char)
 			if randomPlanet.WorldPos and randomPlanet.Size then
 				local radius = randomPlanet.Size / 2
 				local dropHeight = radius + 200
-				
 				root.CFrame = CFrame.new(randomPlanet.WorldPos.X, randomPlanet.WorldPos.Y + dropHeight, randomPlanet.WorldPos.Z)
 				
-				-- FORCE PRE-RENDER SPACE MODE
-				if RenderedPlanets[key] then RenderedPlanets[key]:Destroy() end
+				if RenderedPlanets[key] then self:UnloadPlanet(key) end
+				
 				local model = CreateAtmosphereOnlyModel(randomPlanet)
 				model.Parent = workspace
 				RenderedPlanets[key] = model
@@ -327,7 +340,7 @@ function PlanetController:HandleCharacterSpawn(char)
 	:catch(function(err) warn(err); root.Anchored = false end)
 end
 
-function PlanetController:RenderPlanets(planets: {PlanetData})
+function PlanetController:RenderPlanets(planets)
 	local player = Players.LocalPlayer
 	local char = player.Character
 	local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart
@@ -346,36 +359,31 @@ function PlanetController:RenderPlanets(planets: {PlanetData})
 	AtmosphereState.CurrentPlanetKey = newPlanetKey
 
 	if AtmosphereState.InAtmosphere then
-		-- STATE: INSIDE ATMOSPHERE (FULL RENDER)
 		if lastPlanetKey ~= newPlanetKey and inPlanet then
 			local data = planetByKey[newPlanetKey]
 			if data then
-				local newModel = CreatePlanetModel(data)
+				local newModel = self:CreatePlanetModel(data)
 				newModel.Parent = workspace
 				
-				if RenderedPlanets[newPlanetKey] then RenderedPlanets[newPlanetKey]:Destroy() end
+				if RenderedPlanets[newPlanetKey] then self:UnloadPlanet(newPlanetKey) end
 				RenderedPlanets[newPlanetKey] = newModel
 				
-				-- Destroy all other distant planets to save performance/visuals
-				for key, model in pairs(RenderedPlanets) do
+				for key, _ in pairs(RenderedPlanets) do
 					if key ~= newPlanetKey then
-						model:Destroy()
-						RenderedPlanets[key] = nil
+						self:UnloadPlanet(key)
 					end
 				end
 				
-				local targetConfig: LightingConfig = { Bloom = data.Bloom }
+				local targetConfig = { Bloom = data.Bloom }
 				UpdateLightingEffects(targetConfig)
 				applySky(data.SkyPresetName)
 			end
 			lastPlanetKey = newPlanetKey
 		end
 	else
-		-- STATE: SPACE (ATMOSPHERE ORB RENDER)
 		if lastPlanetKey ~= "_space_" then
-			-- Switch to space mode: clear everything, render only orbs
-			for key, model in pairs(RenderedPlanets) do 
-				model:Destroy(); RenderedPlanets[key] = nil 
+			for key, _ in pairs(RenderedPlanets) do 
+				self:UnloadPlanet(key)
 			end
 			for key, data in pairs(planetByKey) do
 				local m = CreateAtmosphereOnlyModel(data)
@@ -386,7 +394,6 @@ function PlanetController:RenderPlanets(planets: {PlanetData})
 			applySky(DEFAULT_SKY_NAME)
 			lastPlanetKey = "_space_"
 		else
-			-- Update new planets coming into view
 			for key, data in pairs(planetByKey) do
 				if not RenderedPlanets[key] then
 					local m = CreateAtmosphereOnlyModel(data)
@@ -398,12 +405,11 @@ function PlanetController:RenderPlanets(planets: {PlanetData})
 	end
 end
 
--- [INTERNAL HELPERS]
-function PlanetController:_GetPlanetKey(data: PlanetData)
+function PlanetController:_GetPlanetKey(data)
 	return data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
 end
 
-function PlanetController:_GetCurrentPlanetInAtmosphere(planets: {PlanetData}, playerPos: Vector3)
+function PlanetController:_GetCurrentPlanetInAtmosphere(planets, playerPos)
 	local nearest = nil
 	local minDst = math.huge
 	for _, data in ipairs(planets) do
@@ -417,9 +423,7 @@ function PlanetController:_GetCurrentPlanetInAtmosphere(planets: {PlanetData}, p
 	
 	if nearest then
 		local radius = nearest.Size / 2
-		if minDst < radius then 
-			return nearest 
-		end
+		if minDst < radius then return nearest end
 	end
 	return nil
 end

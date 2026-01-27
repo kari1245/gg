@@ -37,7 +37,16 @@ function UIController:KnitStart()
 		OnClick = toggleMenu
 	})
 	buttonInstance.Parent = playerGui
-	
+	-- 2. Mount Fly Tools (Nút bên phải màn hình)
+	local FlyToolsScript = script.Parent.Parent.UI:FindFirstChild("FlyTools")
+	if FlyToolsScript then
+		local FlyTools = require(FlyToolsScript)
+		local flyUI = FlyTools({})
+		flyUI.Parent = playerGui
+		print("✅ [UIController] FlyTools Mounted")
+	else
+		warn("❌ [UIController] FlyTools.luau not found in UI folder!")
+	end
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then return end
 		if input.KeyCode == Enum.KeyCode.M then
