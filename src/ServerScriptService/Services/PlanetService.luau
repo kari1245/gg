@@ -1,8 +1,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
-local Knit = require(ReplicatedStorage.Packages.Knit)
-local PlanetMath = require(ReplicatedStorage.Common.PlanetMath) -- Import Math
+local PlanetMath = require(ReplicatedStorage.Common.PlanetMath)
 
 -- [CONFIGURATION]
 local PLANET_GRID_SPACING = 12000
@@ -11,7 +10,6 @@ local MAX_PLANET_SIZE = 1500
 local NUM_PLANETS = 100
 local REQUEST_COOLDOWN = 0.3
 
--- [CONSTANTS] (Giữ nguyên BiomeTypes cũ của bạn)
 local BiomeTypes = {
 	{Name = "Desert", Color = Color3.fromRGB(232, 213, 160), Emissive = 0},
 	{Name = "Ocean", Color = Color3.fromRGB(36, 104, 160), Emissive = 0},
@@ -33,15 +31,26 @@ local BiomeTypes = {
 local SKY_PRESET_NAMES = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" }
 
 -- [SERVICE DEFINITION]
-local PlanetService = Knit.CreateService {
-	Name = "PlanetService",
-	Client = {},
-}
+local PlanetService = {}
+PlanetService.Name = "PlanetService"
 
 -- Private State
-local _planetGridMap = {} -- Dùng Hash Map cho nhanh
+local _planetGridMap = {}
 local _lastRequestTimes = {}
 
+-- Create Remotes Folder
+local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
+if not Remotes then
+	Remotes = Instance.new("Folder")
+	Remotes.Name = "Remotes"
+	Remotes.Parent = ReplicatedStorage
+end
+
+local GetPlanetsFunc = Instance.new("RemoteFunction")
+GetPlanetsFunc.Name = "GetPlanetsNearPosition"
+GetPlanetsFunc.Parent = Remotes
+
+-- Helper Functions
 local function PickRandomSkyName(seed)
 	if #SKY_PRESET_NAMES == 0 then return "" end
 	local idx = math.floor(PlanetMath.SeededRandom(seed, 1, #SKY_PRESET_NAMES + 0.99))
@@ -56,13 +65,22 @@ local function GetGridKey(x, y, z)
 	return x .. "," .. y .. "," .. z
 end
 
-function PlanetService:KnitInit()
+function PlanetService:Init()
 	print("[PlanetService] Initializing...")
 	self:GenerateAllPlanets()
 	
 	Players.PlayerRemoving:Connect(function(player)
 		_lastRequestTimes[player] = nil
 	end)
+
+	-- Bind Remote
+	GetPlanetsFunc.OnServerInvoke = function(player)
+		return self:GetPlanetsNearPosition(player)
+	end
+end
+
+function PlanetService:Start()
+	-- Runtime logic if needed
 end
 
 function PlanetService:GenerateAllPlanets()
@@ -95,7 +113,6 @@ end
 function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 	local seed = gridX * 73856093 + gridY * 19349663 + gridZ * 83492791
 	
-	-- Calculate Positions
 	local jitterSeed = seed + 12345
 	local jitterX = PlanetMath.GetGridJitter(jitterSeed, PLANET_GRID_SPACING*0.25)
 	local jitterY = PlanetMath.GetGridJitter(jitterSeed+1, PLANET_GRID_SPACING*0.25)
@@ -121,15 +138,12 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 		Z = baseZ + offsetZ
 	}
 
-	-- Height Safety Check
 	local DESTROY_HEIGHT = workspace.FallenPartsDestroyHeight
 	if DESTROY_HEIGHT == -50000 or DESTROY_HEIGHT == 0 then DESTROY_HEIGHT = -500 end 
 	if worldPos.Y - size/2 < (DESTROY_HEIGHT + 800) then return nil end
 	
-	-- Chance to fail generation
 	if PlanetMath.SeededRandom(seed) > 0.9 then return nil end
 
-	-- TRAFFIC OPTIMIZATION: BỎ Objects và GroundTiles
 	return {
 		GridPos = {X = gridX, Y = gridY, Z = gridZ},
 		WorldPos = worldPos,
@@ -139,13 +153,10 @@ function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
 		IsHome = false,
 		SkyPresetName = skyPresetName,
 		Bloom = bloomPreset,
-		-- Objects = objects, <-- BỎ, Client tự tính
-		-- GroundTiles = groundTiles <-- BỎ
 	}
 end
 
--- [CLIENT METHODS]
-function PlanetService.Client:GetPlanetsNearPosition(player)
+function PlanetService:GetPlanetsNearPosition(player)
 	local now = os.clock()
 	local lastTime = _lastRequestTimes[player] or 0
 	if (now - lastTime) < REQUEST_COOLDOWN then return {} end
@@ -157,13 +168,12 @@ function PlanetService.Client:GetPlanetsNearPosition(player)
 	
 	local pos = rootPart.Position
 	
-	-- Spatial Partitioning Lookup (Nhanh hơn duyệt mảng)
 	local pGx = math.floor((pos.X / PLANET_GRID_SPACING) + 0.5)
 	local pGy = math.floor((pos.Y / PLANET_GRID_SPACING) + 0.5)
 	local pGz = math.floor((pos.Z / PLANET_GRID_SPACING) + 0.5)
 	
 	local nearby = {}
-	local range = 1 -- 3x3x3 grid
+	local range = 1 
 	
 	for x = -range, range do
 		for y = -range, range do
@@ -177,7 +187,6 @@ function PlanetService.Client:GetPlanetsNearPosition(player)
 		end
 	end
 	
-	-- Sort by distance
 	table.sort(nearby, function(a, b)
 		local pa = Vector3.new(a.WorldPos.X, a.WorldPos.Y, a.WorldPos.Z)
 		local pb = Vector3.new(b.WorldPos.X, b.WorldPos.Y, b.WorldPos.Z)

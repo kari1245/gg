@@ -6,3 +6,8 @@ realm = "shared"
 private = true
 
 [dependencies]
+# Utilities
+Promise = "eval/promise@4.0.0"
+Janitor = "howmanysmall/janitor@1.16.0"
+Signal = "sleitnick/signal@2.0.1"
+ProfileStore = "loleris/profilestore@1.5.0"

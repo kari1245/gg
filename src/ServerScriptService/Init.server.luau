@@ -1,12 +1,31 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
--- [FIX] Cast to any to prevent strict analysis issues with the package
-local Knit = require(ReplicatedStorage.Packages.Knit) :: any
+local servicesFolder = ServerScriptService:WaitForChild("Services")
+local services = {}
 
--- [ARCHITECTURAL FIX] Use Knit's built-in loader instead of manual loops.
--- This is cleaner and resolves the "Unknown require" type error.
-Knit.AddServices(ServerScriptService.Services)
+-- 1. Load Modules
+for _, module in ipairs(servicesFolder:GetChildren()) do
+	if module:IsA("ModuleScript") then
+		local service = require(module)
+		services[service.Name] = service
+	end
+end
 
-Knit.Start():catch(warn):await()
-print("[SERVER] Knit Started")
+-- 2. Init Lifecycle
+for _, service in pairs(services) do
+	if type(service.Init) == "function" then
+		service:Init()
+	end
+end
+
+-- 3. Start Lifecycle
+for _, service in pairs(services) do
+	if type(service.Start) == "function" then
+		task.spawn(function()
+			service:Start()
+		end)
+	end
+end
+
+print("[SERVER] Architecture Loaded")

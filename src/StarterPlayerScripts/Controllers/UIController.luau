@@ -2,64 +2,59 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local Knit = require(ReplicatedStorage.Packages.Knit) :: any
-local Fusion = require(ReplicatedStorage.Packages.Fusion)
-
-local peek = Fusion.peek
-local scoped = Fusion.scoped
-
+-- Modules
 local SciFiMenu = require(script.Parent.Parent.UI.SciFiMenu)
 local MenuToggleButton = require(script.Parent.Parent.UI.MenuToggleButton)
+local FlyTools = require(script.Parent.Parent.UI.FlyTools)
 
-local UIController = Knit.CreateController { Name = "UIController" }
+local UIController = {}
+UIController.Name = "UIController"
 
-function UIController:KnitStart()
+-- State
+local _isMenuOpen = false
+local _menuInstance = nil
+
+function UIController:Start()
 	print("[UIController] Starting...")
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
 
-	self.Scope = scoped(Fusion)
-	self.IsMenuOpen = self.Scope:Value(false)
-	
-	local function toggleMenu()
-		local currentStatus = peek(self.IsMenuOpen)
-		self.IsMenuOpen:set(not currentStatus)
-	end
+	-- 1. Create Menu (Hidden by default)
+	_menuInstance = SciFiMenu.New()
+	_menuInstance.Enabled = false
+	_menuInstance.Parent = playerGui
 
-	-- Mount Main Menu (Không còn callback xây dựng)
-	local menuInstance = SciFiMenu({
-		Visible = self.IsMenuOpen
-	})
-	menuInstance.Parent = playerGui
+	-- 2. Create Toggle Button
+	local toggleBtn = MenuToggleButton.New(function()
+		self:ToggleMenu()
+	end)
+	toggleBtn.Parent = playerGui
 
-	-- Mount Nút HUD
-	local buttonInstance = MenuToggleButton({
-		OnClick = toggleMenu
-	})
-	buttonInstance.Parent = playerGui
-	-- 2. Mount Fly Tools (Nút bên phải màn hình)
-	local FlyToolsScript = script.Parent.Parent.UI:FindFirstChild("FlyTools")
-	if FlyToolsScript then
-		local FlyTools = require(FlyToolsScript)
-		local flyUI = FlyTools({})
-		flyUI.Parent = playerGui
-		print("✅ [UIController] FlyTools Mounted")
-	else
-		warn("❌ [UIController] FlyTools.luau not found in UI folder!")
-	end
+	-- 3. Create Fly Tools
+	local flyTools = FlyTools.New(function()
+		-- We need to access FlyController lazily or via event
+		-- For simplicity, we assume FlyController is globally require-able or we fire a bindable
+		local controllers = script.Parent
+		local FlyController = require(controllers.FlyController)
+		FlyController:Toggle()
+	end)
+	flyTools.Parent = playerGui
+
+	-- Input Listener
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then return end
 		if input.KeyCode == Enum.KeyCode.M then
-			toggleMenu()
+			self:ToggleMenu()
 		end
 	end)
 	
 	print("[UIController] UI Mounted & Ready.")
 end
 
-function UIController:CloseMenu()
-	if self.IsMenuOpen then
-		self.IsMenuOpen:set(false)
+function UIController:ToggleMenu()
+	_isMenuOpen = not _isMenuOpen
+	if _menuInstance then
+		_menuInstance.Enabled = _isMenuOpen
 	end
 end
 

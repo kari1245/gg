@@ -1,10 +1,4 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Fusion = require(ReplicatedStorage.Packages.Fusion) :: any
-
--- Unpack commonly used Fusion symbols
-local New = Fusion.New
-local Children = Fusion.Children
-local OnEvent = Fusion.OnEvent
+local SciFiMenu = {}
 
 local COLORS = {
 	SLATE_900 = Color3.fromRGB(15, 23, 42),
@@ -16,199 +10,142 @@ local COLORS = {
 	TEXT_GRAY = Color3.fromRGB(148, 163, 184)
 }
 
--- [TYPES]
-type MenuTabProps = {
-	Label: string,
-	IsActive: any, -- Fusion State
-	OnClick: () -> ()
-}
+local function CreateTab(labelName, parent, onClick)
+	local btn = Instance.new("TextButton")
+	btn.Name = labelName
+	btn.Size = UDim2.fromScale(1, 0.1)
+	btn.BackgroundColor3 = COLORS.SLATE_900
+	btn.BackgroundTransparency = 1
+	btn.AutoButtonColor = false
+	btn.Parent = parent
 
--- Component: Tab Menu
-local function MenuTab(scope: any, props: MenuTabProps)
-	local isHovered = scope:Value(false)
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.Padding = UDim.new(0.02, 0)
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.Parent = btn
 	
-	local backgroundColor = scope:Computed(function(use)
-		if use(props.IsActive) then return COLORS.CYAN_900
-		elseif use(isHovered) then return COLORS.SLATE_800
-		else return COLORS.SLATE_900 end
-	end)
-	
-	local textColor = scope:Computed(function(use)
-		return use(props.IsActive) and COLORS.CYAN_400 or COLORS.TEXT_GRAY
-	end)
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0.05, 0)
+	padding.Parent = btn
 
-	-- [FIX] Use Fusion.New(scope, ...) syntax and cast props to any
-	return New(scope, "TextButton") ({
-		Name = props.Label,
-		Size = UDim2.fromScale(1, 0.1),
-		BackgroundColor3 = backgroundColor,
-		BackgroundTransparency = scope:Computed(function(use) 
-			return use(props.IsActive) and 0.7 or (use(isHovered) and 0.5 or 1) 
-		end),
-		AutoButtonColor = false,
-		
-		[OnEvent "MouseEnter"] = function() isHovered:set(true) end,
-		[OnEvent "MouseLeave"] = function() isHovered:set(false) end,
-		[OnEvent "MouseButton1Click"] = props.OnClick,
-		
-		[Children] = {
-			New(scope, "UIListLayout") ({
-				FillDirection = Enum.FillDirection.Horizontal,
-				Padding = UDim.new(0.02, 0),
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				HorizontalAlignment = Enum.HorizontalAlignment.Left,
-			} :: any),
-			
-			New(scope, "UIPadding") ({ PaddingLeft = UDim.new(0.05, 0) } :: any),
-			
-			New(scope, "Frame") ({
-				Size = UDim2.fromScale(0.1, 0.4),
-				SizeConstraint = Enum.SizeConstraint.RelativeYY,
-				BackgroundColor3 = textColor,
-			} :: any),
-			
-			New(scope, "TextLabel") ({
-				Text = props.Label,
-				Font = Enum.Font.Code,
-				TextScaled = true,
-				TextColor3 = textColor,
-				BackgroundTransparency = 1,
-				Size = UDim2.fromScale(0.7, 0.5),
-				AutomaticSize = Enum.AutomaticSize.None
-			} :: any),
-			
-			New(scope, "Frame") ({
-				Size = UDim2.fromScale(0.02, 1),
-				BackgroundColor3 = COLORS.CYAN_400,
-				Visible = props.IsActive,
-				Position = UDim2.fromScale(0, 0)
-			} :: any)
-		}
-	} :: any)
+	local indicator = Instance.new("Frame")
+	indicator.Size = UDim2.fromScale(0.1, 0.4)
+	indicator.SizeConstraint = Enum.SizeConstraint.RelativeYY
+	indicator.BackgroundColor3 = COLORS.TEXT_GRAY
+	indicator.Parent = btn
+
+	local text = Instance.new("TextLabel")
+	text.Text = labelName
+	text.Font = Enum.Font.Code
+	text.TextScaled = true
+	text.TextColor3 = COLORS.TEXT_GRAY
+	text.BackgroundTransparency = 1
+	text.Size = UDim2.fromScale(0.7, 0.5)
+	text.Parent = btn
+	
+	local activeBar = Instance.new("Frame")
+	activeBar.Size = UDim2.fromScale(0.02, 1)
+	activeBar.BackgroundColor3 = COLORS.CYAN_400
+	activeBar.Visible = false
+	activeBar.Parent = btn
+
+	-- Logic
+	btn.MouseButton1Click:Connect(onClick)
+	
+	-- Return object to manipulate later
+	return {
+		Instance = btn,
+		SetActive = function(isActive)
+			activeBar.Visible = isActive
+			text.TextColor3 = isActive and COLORS.CYAN_400 or COLORS.TEXT_GRAY
+			indicator.BackgroundColor3 = isActive and COLORS.CYAN_400 or COLORS.TEXT_GRAY
+			btn.BackgroundTransparency = isActive and 0.7 or 1
+		end
+	}
 end
 
-local function StuddedBackground(scope: any, props: {ZIndex: number?, LayoutOrder: number?})
-	return New(scope, "ImageLabel") ({
-		Name = "StuddedBackground",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		Image = "rbxassetid://6073663785", 
-		ImageTransparency = 0.9,
-		ScaleType = Enum.ScaleType.Tile,
-		TileSize = UDim2.fromOffset(20, 20),
-		ZIndex = props.ZIndex or 1,
-		LayoutOrder = props.LayoutOrder
-	} :: any)
+function SciFiMenu.New()
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "SciFiMenu"
+	screenGui.ResetOnSpawn = false
+	screenGui.DisplayOrder = 10
+
+	local mainContainer = Instance.new("Frame")
+	mainContainer.Name = "MainContainer"
+	mainContainer.Size = UDim2.fromScale(0.8, 0.8)
+	mainContainer.AnchorPoint = Vector2.new(0.5, 0.5)
+	mainContainer.Position = UDim2.fromScale(0.5, 0.5)
+	mainContainer.BackgroundColor3 = COLORS.SLATE_900
+	mainContainer.BorderSizePixel = 2
+	mainContainer.BorderColor3 = COLORS.SLATE_700
+	mainContainer.Parent = screenGui
+
+	-- Sidebar
+	local sidebar = Instance.new("Frame")
+	sidebar.Name = "Sidebar"
+	sidebar.Size = UDim2.fromScale(0.25, 1)
+	sidebar.BackgroundColor3 = COLORS.SLATE_900
+	sidebar.BackgroundTransparency = 0.5
+	sidebar.BorderColor3 = COLORS.SLATE_700
+	sidebar.BorderSizePixel = 1
+	sidebar.Parent = mainContainer
+
+	local listLayout = Instance.new("UIListLayout")
+	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	listLayout.Parent = sidebar
+
+	-- Logo
+	local logoArea = Instance.new("Frame")
+	logoArea.Size = UDim2.fromScale(1, 0.15)
+	logoArea.BackgroundTransparency = 1
+	logoArea.Parent = sidebar
+	
+	local logoText = Instance.new("TextLabel")
+	logoText.Text = "NEOBLOX"
+	logoText.TextColor3 = COLORS.WHITE
+	logoText.Font = Enum.Font.SciFi
+	logoText.TextScaled = true
+	logoText.Size = UDim2.fromScale(0.8, 0.5)
+	logoText.Position = UDim2.fromScale(0.1, 0.25)
+	logoText.BackgroundTransparency = 1
+	logoText.Parent = logoArea
+
+	-- Content Area
+	local content = Instance.new("Frame")
+	content.Name = "Content"
+	content.Size = UDim2.fromScale(0.75, 1)
+	content.Position = UDim2.fromScale(0.25, 0)
+	content.BackgroundTransparency = 1
+	content.Parent = mainContainer
+	
+	local header = Instance.new("TextLabel")
+	header.Text = "DEPLOY"
+	header.Font = Enum.Font.Code
+	header.TextScaled = true
+	header.TextColor3 = COLORS.WHITE
+	header.TextXAlignment = Enum.TextXAlignment.Left
+	header.Size = UDim2.fromScale(1, 0.1)
+	header.BackgroundTransparency = 1
+	header.Position = UDim2.fromScale(0.05, 0.05)
+	header.Parent = content
+
+	-- Tabs Logic
+	local tabs = {}
+	local function SetTab(name)
+		header.Text = name
+		for tName, tabObj in pairs(tabs) do
+			tabObj.SetActive(tName == name)
+		end
+	end
+
+	tabs["DEPLOY"] = CreateTab("DEPLOY", sidebar, function() SetTab("DEPLOY") end)
+	tabs["LOADOUT"] = CreateTab("LOADOUT", sidebar, function() SetTab("LOADOUT") end)
+	tabs["CHARACTER"] = CreateTab("CHARACTER", sidebar, function() SetTab("CHARACTER") end)
+
+	SetTab("DEPLOY") -- Default
+
+	return screenGui
 end
 
--- [MAIN COMPONENT]
-return function(props: {Visible: any})
-	local scope = Fusion.scoped(Fusion)
-	local activeTab = scope:Value("DEPLOY") 
-	
-	local gui = New(scope, "ScreenGui") ({
-		Name = "SciFiMenu",
-		ResetOnSpawn = false,
-		Enabled = props.Visible,
-		DisplayOrder = 10,
-		
-		[Children] = {
-			New(scope, "Frame") ({
-				Name = "MainContainer",
-				Size = UDim2.fromScale(0.8, 0.8),
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
-				BackgroundColor3 = COLORS.SLATE_900,
-				BorderSizePixel = 2,
-				BorderColor3 = COLORS.SLATE_700,
-				
-				[Children] = {
-					StuddedBackground(scope, {}),
-					
-					-- Sidebar
-					New(scope, "Frame") ({
-						Name = "Sidebar",
-						Size = UDim2.fromScale(0.25, 1),
-						BackgroundColor3 = COLORS.SLATE_900,
-						BackgroundTransparency = 0.5,
-						BorderColor3 = COLORS.SLATE_700,
-						BorderSizePixel = 1,
-						
-						[Children] = {
-							New(scope, "UIListLayout") ({ SortOrder = Enum.SortOrder.LayoutOrder } :: any),
-							
-							New(scope, "Frame") ({ -- Logo Area
-								Size = UDim2.fromScale(1, 0.15),
-								BackgroundTransparency = 1,
-								[Children] = {
-									New(scope, "TextLabel") ({
-										Text = "NEOBLOX",
-										TextColor3 = COLORS.WHITE,
-										Font = Enum.Font.SciFi,
-										TextScaled = true,
-										Size = UDim2.fromScale(0.8, 0.5),
-										Position = UDim2.fromScale(0.1, 0.25),
-										BackgroundTransparency = 1
-									} :: any)
-								}
-							} :: any),
-							
-							-- Tabs
-							MenuTab(scope, { 
-								Label = "DEPLOY", 
-								IsActive = scope:Computed(function(use) return use(activeTab) == "DEPLOY" end),
-								OnClick = function() activeTab:set("DEPLOY") end
-							}),
-							MenuTab(scope, { 
-								Label = "LOADOUT", 
-								IsActive = scope:Computed(function(use) return use(activeTab) == "LOADOUT" end),
-								OnClick = function() activeTab:set("LOADOUT") end
-							}),
-							MenuTab(scope, { 
-								Label = "CHARACTER", 
-								IsActive = scope:Computed(function(use) return use(activeTab) == "CHARACTER" end),
-								OnClick = function() activeTab:set("CHARACTER") end
-							}),
-						}
-					} :: any),
-					
-					-- Content Area
-					New(scope, "Frame") ({
-						Name = "Content",
-						Size = UDim2.fromScale(0.75, 1),
-						Position = UDim2.fromScale(0.25, 0),
-						BackgroundTransparency = 1,
-						[Children] = {
-							New(scope, "UIPadding") ({
-								PaddingTop = UDim.new(0.05, 0), PaddingLeft = UDim.new(0.05, 0),
-								PaddingRight = UDim.new(0.05, 0), PaddingBottom = UDim.new(0.05, 0)
-							} :: any),
-							
-							New(scope, "TextLabel") ({
-								Text = scope:Computed(function(use) return use(activeTab) end),
-								Font = Enum.Font.Code,
-								TextScaled = true,
-								TextColor3 = COLORS.WHITE,
-								TextXAlignment = Enum.TextXAlignment.Left,
-								Size = UDim2.fromScale(1, 0.1),
-								BackgroundTransparency = 1
-							} :: any),
-							
-							New(scope, "TextLabel") ({
-								Text = "Select an option from the sidebar.",
-								TextColor3 = COLORS.TEXT_GRAY,
-								BackgroundTransparency = 1,
-								Size = UDim2.fromScale(1, 0.5),
-								Position = UDim2.fromScale(0, 0.2),
-								TextScaled = true
-							} :: any)
-						}
-					} :: any)
-				}
-			} :: any)
-		}
-	} :: any)
-	
-	gui.Destroying:Connect(function() scope:doCleanup() end)
-	return gui
-end
+return SciFiMenu

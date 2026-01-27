@@ -5,7 +5,6 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local ContentProvider = game:GetService("ContentProvider")
 
-local Knit = require(ReplicatedStorage.Packages.Knit) :: any
 local Promise = require(ReplicatedStorage.Packages.Promise)
 local PlanetMath = require(ReplicatedStorage.Common.PlanetMath)
 local ObjectPool = require(ReplicatedStorage.Common.ObjectPool)
@@ -14,7 +13,6 @@ local ObjectPool = require(ReplicatedStorage.Common.ObjectPool)
 local UPDATE_THRESHOLD = 100 
 local TWEEN_INFO_LIGHTING = TweenInfo.new(2.0, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 local DEFAULT_SKY_NAME = "Space"
-
 local DEFAULT_LIGHTING = {
 	Brightness = 1.5,
 	Ambient = Color3.fromRGB(10,10,20),
@@ -26,7 +24,8 @@ local DEFAULT_LIGHTING = {
 }
 
 -- [CONTROLLER DEFINITION]
-local PlanetController = Knit.CreateController { Name = "PlanetController" }
+local PlanetController = {}
+PlanetController.Name = "PlanetController"
 
 -- [STATE]
 local RenderedPlanets = {}
@@ -35,9 +34,9 @@ local CachedPlanets = {}
 local currentFetchPromise = nil
 local activeLightingTweens = {}
 local lastPlanetKey = nil
-
--- [POOLS]
 local Pools = {} 
+
+local GetPlanetsFunc = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("GetPlanetsNearPosition")
 
 -- [HELPER FUNCTIONS]
 local function toColor(t)
@@ -105,9 +104,7 @@ local function applySky(skyName)
 	end
 end
 
--- [ASSET SYSTEM - CORRECTED PATH]
 function PlanetController:SetupPools()
-	-- Cấu hình: Folder nằm trực tiếp trong ReplicatedStorage
 	local categories = {
 		{FolderName = "Trees", Type = "Tree"},
 		{FolderName = "Rocks", Type = "Rock"}
@@ -116,25 +113,17 @@ function PlanetController:SetupPools()
 	local assetsToPreload = {}
 
 	for _, cat in ipairs(categories) do
-		-- [FIX] Tìm trực tiếp trong ReplicatedStorage
 		local folder = ReplicatedStorage:FindFirstChild(cat.FolderName)
 		
 		if folder then
 			for _, model in ipairs(folder:GetChildren()) do
-				-- Key duy nhất: "Tree_1", "Tree_2", "Rock_1", ...
 				local poolKey = cat.Type .. "_" .. model.Name 
-				
-				-- Tạo Pool (30 objects mỗi loại)
 				Pools[poolKey] = ObjectPool.new(model, 30)
 				table.insert(assetsToPreload, model)
-				print("[PlanetController] Pool Ready:", poolKey)
 			end
-		else
-			warn("[PlanetController] Missing folder in ReplicatedStorage:", cat.FolderName)
 		end
 	end
 
-	-- Preload assets thật
 	if #assetsToPreload > 0 then
 		task.spawn(function()
 			pcall(function() ContentProvider:PreloadAsync(assetsToPreload) end)
@@ -142,7 +131,6 @@ function PlanetController:SetupPools()
 	end
 end
 
--- [RENDER LOGIC]
 local function CreateAtmosphereOnlyModel(data)
 	local model = Instance.new("Model")
 	model.Name = "PlanetAtmosphere_" .. data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
@@ -166,7 +154,6 @@ function PlanetController:CreatePlanetModel(data)
 	local model = Instance.new("Model")
 	model.Name = "Planet_" .. data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
 	
-	-- Core & Atmosphere
 	local atmosphere = Instance.new("Part")
 	atmosphere.Name = "Atmosphere"
 	atmosphere.Size = Vector3.new(data.Size, data.Size, data.Size)
@@ -180,7 +167,6 @@ function PlanetController:CreatePlanetModel(data)
 	pcall(function() atmosphere.LocalTransparencyModifier = 0 end)
 	atmosphere.Parent = model
 
-	-- Ground
 	local groundFolder = Instance.new("Folder", model)
 	groundFolder.Name = "GroundTiles"
 	local tileY = 3
@@ -195,18 +181,15 @@ function PlanetController:CreatePlanetModel(data)
 	tile.TopSurface = Enum.SurfaceType.Studs
 	tile.Parent = groundFolder
 
-	-- OBJECTS GENERATION (CORRECT KEY LOOKUP)
 	local objectsFolder = Instance.new("Folder", model)
 	objectsFolder.Name = "Objects"
 	
 	local objectsData = PlanetMath.GenerateVegetationData(data.Seed, data.Size, Vector3.new(data.WorldPos.X, data.WorldPos.Y, data.WorldPos.Z))
 	
 	for _, obj in ipairs(objectsData) do
-		-- Logic: obj.Type="Tree", obj.Model="1" -> Key="Tree_1"
 		local poolKey = obj.Type .. "_" .. obj.Model 
 		local pool = Pools[poolKey]
 		
-		-- Fallback: Nếu không tìm thấy Tree_5, thử tìm Tree_1
 		if not pool then
 			pool = Pools[obj.Type .. "_1"] 
 		end
@@ -225,7 +208,6 @@ function PlanetController:CreatePlanetModel(data)
 					item.CFrame = cf * CFrame.new(0, item.Size.Y/2, 0)
 				end
 				
-				-- Lưu key để trả về đúng kho khi unload
 				item:SetAttribute("PoolType", poolKey)
 				item.Parent = objectsFolder
 			end
@@ -254,11 +236,10 @@ function PlanetController:UnloadPlanet(key)
 	RenderedPlanets[key] = nil
 end
 
-function PlanetController:KnitStart()
-	print("[PlanetController] Started - Direct RepStorage Access")
+function PlanetController:Start()
+	print("[PlanetController] Started")
 	self:SetupPools()
 	
-	self.PlanetService = Knit.GetService("PlanetService")
 	local player = Players.LocalPlayer
 	
 	if player.Character then self:HandleCharacterSpawn(player.Character) end
@@ -291,7 +272,8 @@ end
 function PlanetController:FetchPlanetsFromServer()
 	if currentFetchPromise then currentFetchPromise:cancel() end
 	currentFetchPromise = Promise.new(function(resolve, reject)
-		self.PlanetService:GetPlanetsNearPosition():andThen(resolve):catch(reject)
+		local result = GetPlanetsFunc:InvokeServer()
+		if result then resolve(result) else reject("Failed") end
 	end)
 	return currentFetchPromise
 end

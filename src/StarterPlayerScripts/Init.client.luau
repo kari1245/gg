@@ -1,14 +1,31 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
 
--- [FIX] Cast to any to prevent strict analysis issues
-local Knit = require(ReplicatedStorage.Packages.Knit) :: any
+local controllersFolder = script.Parent:WaitForChild("Controllers")
+local controllers = {}
 
--- [FIX] Reference the RUNNING folder in PlayerScripts, not the template in StarterPlayer
-local Controllers = script.Parent:WaitForChild("Controllers")
+-- 1. Load Modules
+for _, module in ipairs(controllersFolder:GetChildren()) do
+	if module:IsA("ModuleScript") then
+		local controller = require(module)
+		controllers[controller.Name] = controller
+	end
+end
 
--- [ARCHITECTURAL FIX] Use Knit's built-in loader.
--- This automatically loads all ModuleScripts in the folder.
-Knit.AddControllers(Controllers)
+-- 2. Init Lifecycle
+for _, controller in pairs(controllers) do
+	if type(controller.Init) == "function" then
+		controller:Init()
+	end
+end
 
-Knit.Start():catch(warn):await()
-print("[CLIENT] Knit Started")
+-- 3. Start Lifecycle
+for _, controller in pairs(controllers) do
+	if type(controller.Start) == "function" then
+		task.spawn(function()
+			controller:Start()
+		end)
+	end
+end
+
+print("[CLIENT] Architecture Loaded")
