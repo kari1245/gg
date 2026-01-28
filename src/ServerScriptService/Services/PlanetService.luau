@@ -6,12 +6,12 @@ local PlanetMath = require(ReplicatedStorage.Common.PlanetMath)
 local SERVER_SESSION_SEED = math.random(1, 1000000000)
 print(`[PlanetService] Universe Generated with Session Seed: {SERVER_SESSION_SEED}`)
 -- [CONFIGURATION]
-local PLANET_GRID_SPACING = 12000
+local PLANET_GRID_SPACING = 20000
 local MIN_PLANET_SIZE = 400
 local MAX_PLANET_SIZE = 1000
-local NUM_PLANETS = 300 -- Giữ nguyên số lượng lớn để mật độ dày
+local NUM_PLANETS = 500 -- Giữ nguyên số lượng lớn để mật độ dày
 local SPAWN_CHANCE = 1 
-local MAX_VISIBLE_PLANETS = 20 -- [NEW] Giới hạn cứng số lượng hành tinh gửi về
+local MAX_VISIBLE_PLANETS = 30 -- [NEW] Giới hạn cứng số lượng hành tinh gửi về
 
 local BiomeTypes = {
     {Name = "Desert", Color = Color3.fromRGB(232, 213, 160), Emissive = 0},
