@@ -331,6 +331,7 @@ function PlanetController:RenderPlanets(planets)
 	local playerPos = root.Position
 	local inPlanet = self:_GetCurrentPlanetInAtmosphere(planets, playerPos)
 	
+	-- Tạo Map để tra cứu nhanh: [Key] = Data
 	local planetByKey = {}
 	for _, data in ipairs(planets) do
 		planetByKey[self:_GetPlanetKey(data)] = data
@@ -341,15 +342,18 @@ function PlanetController:RenderPlanets(planets)
 	AtmosphereState.CurrentPlanetKey = newPlanetKey
 
 	if AtmosphereState.InAtmosphere then
+		-- LOGIC: KHI ĐANG Ở TRONG HÀNH TINH
 		if lastPlanetKey ~= newPlanetKey and inPlanet then
 			local data = planetByKey[newPlanetKey]
 			if data then
+				-- Tạo Model Full Chi Tiết cho hành tinh đang đứng
 				local newModel = self:CreatePlanetModel(data)
 				newModel.Parent = workspace
 				
 				if RenderedPlanets[newPlanetKey] then self:UnloadPlanet(newPlanetKey) end
 				RenderedPlanets[newPlanetKey] = newModel
 				
+				-- Xóa TẤT CẢ các hành tinh khác để tập trung vào hành tinh này (Logic cũ của bạn)
 				for key, _ in pairs(RenderedPlanets) do
 					if key ~= newPlanetKey then
 						self:UnloadPlanet(key)
@@ -363,7 +367,9 @@ function PlanetController:RenderPlanets(planets)
 			lastPlanetKey = newPlanetKey
 		end
 	else
+		-- LOGIC: KHI ĐANG Ở NGOÀI VŨ TRỤ (SPACE)
 		if lastPlanetKey ~= "_space_" then
+			-- [CHUYỂN GIAO] Từ hành tinh ra vũ trụ: Reset lại toàn bộ
 			for key, _ in pairs(RenderedPlanets) do 
 				self:UnloadPlanet(key)
 			end
@@ -376,11 +382,22 @@ function PlanetController:RenderPlanets(planets)
 			applySky(DEFAULT_SKY_NAME)
 			lastPlanetKey = "_space_"
 		else
+			-- [DUY TRÌ] Đang bay trong vũ trụ
+			
+			-- 1. Render thêm các hành tinh mới xuất hiện
 			for key, data in pairs(planetByKey) do
 				if not RenderedPlanets[key] then
 					local m = CreateAtmosphereOnlyModel(data)
 					m.Parent = workspace
 					RenderedPlanets[key] = m
+				end
+			end
+
+			-- 2. [FIX QUAN TRỌNG] Xóa các hành tinh đã đi quá xa
+			-- (Đoạn này là đoạn code bạn thiếu khiến hành tinh cũ không mất đi)
+			for key, _ in pairs(RenderedPlanets) do
+				if not planetByKey[key] then -- Nếu hành tinh đang hiện không còn nằm trong list server gửi
+					self:UnloadPlanet(key)
 				end
 			end
 		end

@@ -1,0 +1,660 @@
+﻿--- ROBLOX PROJECT ARCHITECTURE (SKELETON) ---
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Common\GameConfig.luau
+----------------------------------------
+return GameConfig
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Common\ObjectPool.luau
+----------------------------------------
+function ObjectPool.new(template: Instance, initSize: number)
+	return self
+function ObjectPool:CreateNew()
+	return clone
+function ObjectPool:Get()
+	return item
+function ObjectPool:Return(item: Instance)
+function ObjectPool:Destroy()
+return ObjectPool
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Common\PlanetMath.luau
+----------------------------------------
+function PlanetMath.SeededRandom(seed: number, min: number?, max: number?): number
+	return frac
+function PlanetMath.GetGridJitter(seed: number, amount: number): number
+	return (x - math.floor(x)) * 2 * amount - amount
+function PlanetMath.GenerateVegetationData(seed: number, size: number, worldPos: Vector3)
+	return objects
+return PlanetMath
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Packages\Janitor\init.luau
+----------------------------------------
+local Promise = require(script.Promise)
+		return "LinkToInstanceIndex"
+export type Janitor = typeof(setmetatable(
+function Janitor.new(): Janitor
+	return setmetatable({
+function Janitor.Is(object: any): boolean
+	return type(object) == "table" and getmetatable(object) == Janitor
+local function Remove(self: Private, index: any)
+			return self
+	return self
+local function Add<T>(self: Private, object: T, methodName: BooleanOrString?, index: any?): T
+	return object
+	function or have `task.cancel` called on it if it is a thread. If passed an
+	Returns the `object`.
+	function for a very naive typecheck. RBXConnections will be assigned to
+function Janitor:AddObject<T, A...>(constructor: {new: (A...) -> T}, methodName: BooleanOrString?, index: any?, ...: A...): T
+	return Add(self, constructor.new(...), methodName, index)
+function Janitor:AddPromise<T...>(promiseObject: Promise<T...>): Promise<T...>
+		return promiseObject
+				return
+		return newPromise :: never
+	return promiseObject
+function Private:RemoveNoClean(index: any)
+	return self
+function Janitor:RemoveList(...: any)
+			return Remove(self, ...)
+			return self
+			return self
+	return self
+function Janitor:RemoveListNoClean(...: any)
+			return self
+			return self
+			return self
+	return self
+function Janitor:Get(index: any): any?
+	return if this then this[index] else nil
+	Returns a frozen copy of the Janitor's indices.
+function Janitor:GetAll(): {[any]: any}
+	return if this then table.freeze(table.clone(this)) else {}
+local function GetFenv(self: Private): () -> (any, BooleanOrString)
+	return function(): ()
+				return object, methodName
+local function Cleanup(self: Private)
+function Janitor:Destroy()
+local function LinkToInstance(self: Private, object: Instance, allowMultiple: boolean?): RBXScriptConnection
+	return Add(self, object.Destroying:Connect(function()
+function Janitor:LinkToInstances(...: Instance)
+	return manualCleanup
+function Private:__tostring()
+	return "Janitor"
+return Janitor :: Static
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Packages\Janitor\Promise.luau
+----------------------------------------
+local Promise = require(Packages.Promise)
+export type Status = "Started" | "Resolved" | "Rejected" | "Cancelled"
+export type ErrorKind = "ExecutionError" | "AlreadyCancelled" | "NotResolvedInTime" | "TimedOut"
+export type Error = typeof(setmetatable(
+export type Promise = {
+export type TypedPromise<T...> = {
+export type PromiseStatic = {
+return Promise :: PromiseStatic?
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Packages\_Index\evaera_promise@4.0.0\promise\init.luau
+----------------------------------------
+local function isCallable(value)
+		return true
+			return true
+	return false
+local function makeEnum(enumName, members)
+	return setmetatable(enum, {
+	function Error.new(options, parent)
+		return setmetatable({
+	function Error.is(anything)
+				return rawget(anything, "error") ~= nil and type(rawget(metatable, "extend")) == "function"
+		return false
+	function Error.isKind(anything, kind)
+		return Error.is(anything) and anything.kind == kind
+	function Error:extend(options)
+		return Error.new(options, self)
+	function Error:getErrorChain()
+		return runtimeErrors
+	function Error:__tostring()
+		return table.concat(errorStrings, "\n")
+local function pack(...)
+	return select("#", ...), { ... }
+	Returns first value (success), and packs all following values.
+local function packResult(success, ...)
+	return success, select("#", ...), { ... }
+local function makeErrorHandler(traceback)
+	return function(err)
+			return err
+		return Error.new({
+local function runExecutor(traceback, callback, ...)
+	return packResult(xpcall(callback, makeErrorHandler(traceback), ...))
+local function createAdvancer(traceback, callback, resolve, reject)
+	return function(...)
+local function isEmpty(t)
+	return next(t) == nil
+function Promise._new(traceback, callback, parent)
+	local function resolve(...)
+	local function reject(...)
+	local function onCancel(cancellationHook)
+		return self._status == Promise.Status.Cancelled
+	return self
+		return Promise.new(function(resolve, reject, onCancel)
+function Promise.new(executor)
+	return Promise._new(debug.traceback(nil, 2), executor)
+function Promise:__tostring()
+	return string.format("Promise(%s)", self._status)
+	local function waitForChild(instance, childName, timeout)
+	  return Promise.defer(function(resolve, reject)
+function Promise.defer(executor)
+	return promise
+	function getSomething(name)
+			return Promise.resolve(cache[name])
+			return Promise.new(function(resolve, reject)
+function Promise.resolve(...)
+	return Promise._new(debug.traceback(nil, 2), function(resolve)
+function Promise.reject(...)
+	return Promise._new(debug.traceback(nil, 2), function(_, reject)
+function Promise._try(traceback, callback, ...)
+	return Promise._new(traceback, function(resolve)
+		return math.random(1, 2) == 1 and "ok" or error("Oh an error!")
+function Promise.try(callback, ...)
+	return Promise._try(debug.traceback(nil, 2), callback, ...)
+	Returns a new promise that:
+function Promise._all(traceback, promises, amount)
+		return Promise.resolve({})
+	return Promise._new(traceback, function(resolve, reject, onCancel)
+		local function cancel()
+		local function resolveOne(i, ...)
+				return
+		returnsAPromise("example 1"),
+		returnsAPromise("example 2"),
+		returnsAPromise("example 3"),
+	return Promise.all(promises)
+function Promise.all(promises)
+	return Promise._all(debug.traceback(nil, 2), promises)
+			return cost -- blueberries are free!
+			return fetchPrice(fruit):andThen(function(fruitCost)
+				return cost + fruitCost
+function Promise.fold(list, reducer, initialValue)
+	return Promise.each(list, function(resolvedElement, i)
+			return reducer(previousValueResolved, resolvedElement, i)
+		return accumulator
+		returnsAPromise("example 1"),
+		returnsAPromise("example 2"),
+		returnsAPromise("example 3"),
+	return Promise.some(promises, 2) -- Only resolves with first 2 promises to resolve
+function Promise.some(promises, count)
+	return Promise._all(debug.traceback(nil, 2), promises, count)
+		returnsAPromise("example 1"),
+		returnsAPromise("example 2"),
+		returnsAPromise("example 3"),
+	return Promise.any(promises) -- Resolves with first value to resolve (only rejects if all 3 rejected)
+function Promise.any(promises)
+	return Promise._all(debug.traceback(nil, 2), promises, 1):andThen(function(values)
+		return values[1]
+		returnsAPromise("example 1"),
+		returnsAPromise("example 2"),
+		returnsAPromise("example 3"),
+	return Promise.allSettled(promises)
+function Promise.allSettled(promises)
+		return Promise.resolve({})
+	return Promise._new(debug.traceback(nil, 2), function(resolve, _, onCancel)
+		local function resolveOne(i, ...)
+		returnsAPromise("example 1"),
+		returnsAPromise("example 2"),
+		returnsAPromise("example 3"),
+	return Promise.race(promises) -- Only returns 1st value to resolve or reject
+function Promise.race(promises)
+	return Promise._new(debug.traceback(nil, 2), function(resolve, reject, onCancel)
+		local function cancel()
+		local function finalize(callback)
+			return function(...)
+				return callback(...)
+			return
+		return Promise.delay(1):andThen(function()
+	Returns a Promise containing an array of the returned/resolved values from the predicate for each item in the array of values.
+function Promise.each(list, predicate)
+	return Promise._new(debug.traceback(nil, 2), function(resolve, reject, onCancel)
+		local function cancel()
+					return reject(Error.new({
+					return reject(select(2, value:await()))
+					return ...
+					return reject(value)
+				return
+				return reject(result)
+function Promise.is(object)
+		return false
+		return true
+		return isCallable(object.andThen)
+		return true
+	return false
+		return player:IsInGroup(groupId)
+function Promise.promisify(callback)
+	return function(...)
+		return Promise._try(debug.traceback(nil, 2), callback, ...)
+	Returns a Promise that resolves after `seconds` seconds have passed. The Promise resolves with the actual amount of time that was waited.
+	function Promise.delay(seconds)
+		return Promise._new(debug.traceback(nil, 2), function(resolve, _, onCancel)
+	Returns a new Promise that resolves if the chained Promise resolves within `seconds` seconds, or rejects if execution time exceeds `seconds`. The chained Promise will be cancelled if the timeout is reached.
+			return Promise.reject(
+function Promise.prototype:timeout(seconds, rejectionValue)
+	return Promise.race({
+			return Promise.reject(rejectionValue == nil and Error.new({
+	Returns the current Promise status.
+function Promise.prototype:getStatus()
+	return self._status
+function Promise.prototype:_andThen(traceback, successHandler, failureHandler)
+		return promise
+	return Promise._new(traceback, function(resolve, reject, onCancel)
+function Promise.prototype:andThen(successHandler, failureHandler)
+	return self:_andThen(debug.traceback(nil, 2), successHandler, failureHandler)
+	Returns a Promise that resolves if the `failureHandler` worked without encountering an additional error.
+function Promise.prototype:catch(failureHandler)
+	return self:_andThen(debug.traceback(nil, 2), nil, failureHandler)
+function Promise.prototype:tap(tapHandler)
+	return self:_andThen(debug.traceback(nil, 2), function(...)
+			return callbackReturn:andThen(function()
+				return unpack(values, 1, length)
+		return ...
+		return someFunction("some", "arguments")
+function Promise.prototype:andThenCall(callback, ...)
+	return self:_andThen(debug.traceback(nil, 2), function()
+		return callback(unpack(values, 1, length))
+			return "some", "values"
+function Promise.prototype:andThenReturn(...)
+	return self:_andThen(debug.traceback(nil, 2), function()
+		return unpack(values, 1, length)
+function Promise.prototype:cancel()
+		return
+function Promise.prototype:_consumerCancelled(consumer)
+		return
+function Promise.prototype:_finally(traceback, finallyHandler)
+	return promise
+	Returns a new Promise that:
+function Promise.prototype:finally(finallyHandler)
+	return self:_finally(debug.traceback(nil, 2), finallyHandler)
+function Promise.prototype:finallyCall(callback, ...)
+	return self:_finally(debug.traceback(nil, 2), function()
+		return callback(unpack(values, 1, length))
+			return "some", "values"
+function Promise.prototype:finallyReturn(...)
+	return self:_finally(debug.traceback(nil, 2), function()
+		return unpack(values, 1, length)
+function Promise.prototype:awaitStatus()
+				function() end
+		return self._status, unpack(self._values, 1, self._valuesLength)
+		return self._status, unpack(self._values, 1, self._valuesLength)
+	return self._status
+local function awaitHelper(status, ...)
+	return status == Promise.Status.Resolved, ...
+function Promise.prototype:await()
+	return awaitHelper(self:awaitStatus())
+local function expectHelper(status, ...)
+	return ...
+function Promise.prototype:expect()
+	return expectHelper(self:awaitStatus())
+function Promise.prototype:_unwrap()
+	return success, unpack(self._values, 1, self._valuesLength)
+function Promise.prototype:_resolve(...)
+		return
+				return self:_reject(maybeRuntimeError:extend({
+		return
+function Promise.prototype:_reject(...)
+		return
+				return
+				return
+function Promise.prototype:_finalize()
+function Promise.prototype:now(rejectionValue)
+		return self:_andThen(traceback, function(...)
+			return ...
+		return Promise.reject(rejectionValue == nil and Error.new({
+	local function canFail(a, b, c)
+		return Promise.new(function(resolve, reject)
+function Promise.retry(callback, times, ...)
+	return Promise.resolve(callback(...)):catch(function(...)
+			return Promise.retry(callback, times - 1, unpack(args, 1, length))
+			return Promise.reject(...)
+function Promise.retryWithDelay(callback, times, seconds, ...)
+	return Promise.resolve(callback(...)):catch(function(...)
+			return Promise.retryWithDelay(callback, times - 1, seconds, unpack(args, 1, length))
+			return Promise.reject(...)
+	return Promise.fromEvent(somePart.Touched, function(part)
+		return part.Name == "Something specific"
+function Promise.fromEvent(event, predicate)
+		return true
+	return Promise._new(debug.traceback(nil, 2), function(resolve, _, onCancel)
+		local function disconnect()
+			return disconnect()
+function Promise.onUnhandledRejection(callback)
+	return function()
+return Promise
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Packages\_Index\evaera_promise@4.0.0\promise\init.spec.luau
+----------------------------------------
+return function()
+	local Promise = require(script.Parent)
+			return injectedPromiseTime
+		function advanceTime(delta)
+	local function pack(...)
+		return len, { ... }
+			local function callback(promise, rejectionA, rejectionB)
+			local function nestedCall(text)
+				return 5
+				return 5
+				return "foo"
+				return pending
+			local function finally()
+					return 1
+					return 42
+				return Promise.new(function(r)
+				return Promise.new(function(_, r)
+				return internal
+				return sum + element
+					return Promise.delay(1):andThenReturn(sum + element)
+					return sum + element
+					return Promise.reject(errorMessage)
+					return sum + element
+					return sum + element
+					return secondPromise
+			local function test(n)
+				return n + 1
+					return v + 1
+					return v + 1
+					return Promise.new(function(resolve)
+				return { ... }
+				return Promise.new(function(resolve)
+				return Promise.reject("foobar")
+				return value * 2
+				return "never"
+				return Promise.new(function() end)
+				return innerPromise
+					return Promise.resolve("ok")
+				return Promise.reject("fail")
+				return Promise.reject("fail")
+					return Promise.resolve("ok")
+				return Promise.reject("fail")
+				return param == "foo"
+					return 1
+			function OldPromise.prototype:andThen() end
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Packages\_Index\sleitnick_signal@2.0.1\signal\init.luau
+----------------------------------------
+export type Connection = {
+export type Signal<T...> = {
+local function acquireRunnerThreadAndCallEventHandler(fn, ...)
+local function runEventHandlerInFreeThread(...)
+function Connection:Disconnect()
+		return
+function Signal.new<T...>(): Signal<T...>
+	return self
+function Signal.Wrap<T...>(rbxScriptSignal: RBXScriptSignal): Signal<T...>
+	return signal
+function Signal.Is(obj: any): boolean
+	return type(obj) == "table" and getmetatable(obj) == Signal
+function Signal:Connect(fn)
+	return connection
+function Signal:ConnectOnce(fn)
+	return self:Once(fn)
+function Signal:Once(fn)
+			return
+	return connection
+function Signal:GetConnections()
+	return items
+function Signal:DisconnectAll()
+function Signal:Fire(...)
+function Signal:FireDeferred(...)
+function Signal:Wait()
+	return coroutine.yield()
+function Signal:Destroy()
+return table.freeze({
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Packages\_Index\sleitnick_signal@2.0.1\signal\init.spec.luau
+----------------------------------------
+local function AwaitCondition(predicate, timeout)
+			return true
+			return false
+return function()
+	local Signal = require(script.Parent)
+	local function NumConns(sig)
+		return #sig:GetConnections()
+				return fired
+				return (send == value)
+				return (send == value)
+				return a == 3
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Packages\ProfileStore.luau
+----------------------------------------
+	Functions:
+	local function AcquireRunnerThreadAndCallEventHandler(fn, ...)
+	local function RunEventHandlerInFreeThread(...)
+	function Connection:Disconnect()
+			return
+	function SignalClass.New()
+		return self
+	function SignalClass:Connect(listener: (...any) -> ())
+		return connection
+	function SignalClass:GetListenerCount(): number
+		return self.listener_count
+	function SignalClass:Fire(...)
+	function SignalClass:Wait()
+		return coroutine.yield()
+local function WaitInUpdateQueue(session_token) --> next_in_queue()
+	return function()
+local function SessionToken(store_name, profile_key, is_mock)
+	return session_token
+local function DeepCopyTable(t)
+	return copy
+local function ReconcileTable(target, template)
+local function RegisterError(error_message, store_name, profile_key) -- Called when a DataStore API call errors
+local function RegisterOverwrite(store_name, profile_key) -- Called when a corrupted profile is loaded
+local function NewMockDataStoreKeyInfo(params)
+	return {
+			return DeepCopyTable(meta_data)
+			return DeepCopyTable(user_ids)
+local function MockUpdateAsync(mock_data_store, profile_store_name, key, transform_function, is_get_call) --> loaded_data, key_info
+		return nil
+		return DeepCopyTable(transform), mock_entry ~= nil and NewMockDataStoreKeyInfo(mock_entry) or nil
+local function UpdateAsync(profile_store, profile_key, transform_params, is_user_mock, is_get_call, version) --> loaded_data, key_info
+			return latest_data, latest_data.UserIds, latest_data.RobloxMetaData
+		return loaded_data, key_info
+		return nil
+local function IsThisSession(session_tag)
+	return session_tag[1] == PlaceId and session_tag[2] == JobId
+local function ReadMockFlag(): boolean
+	return is_mock
+local function WaitForStoreReady(profile_store)
+local function AddProfileToAutoSave(profile)
+local function RemoveProfileFromAutoSave(profile)
+local function SaveProfileAsync(profile, is_ending_session, is_overwriting, last_save_reason)
+export type JSONAcceptable = { JSONAcceptable } | { [string]: JSONAcceptable } | number | string | boolean
+export type Profile<T> = {
+export type VersionQuery<T> = {
+export type ProfileStore<T> = {
+export type ProfileStoreModule = {
+function Profile.New(raw_data, key_info, profile_store, key, is_mock, session_token)
+	return self
+function Profile:IsActive()
+	return ActiveSessionCheck[self.session_token] == self
+function Profile:Reconcile()
+function Profile:EndSession()
+function Profile:AddUserId(user_id) -- Associates user_id with profile (GDPR compliance)
+		return
+		return -- Avoid giving real Roblox APIs negative UserId's
+function Profile:RemoveUserId(user_id) -- Removes user_id association with profile (safe function)
+		return
+function Profile:SetAsync() -- Saves the profile to the DataStore and removes the session lock
+function Profile:MessageHandler(fn)
+		return -- Don't process messages if the profile session was ended
+function Profile:Save()
+		return
+function ProfileStore.SetConstant(name, value)
+function ProfileStore.Test()
+	return {
+function ProfileStore.New(store_name, template)
+				return self:StartSessionAsync(profile_key)
+				return self:MessageAsync(profile_key, message)
+				return self:GetAsync(profile_key, version)
+				return self:VersionQuery(profile_key, sort_direction, min_date, max_date)
+				return self:RemoveAsync(profile_key)
+	return self
+local function RobloxMessageSubscription(profile, unique_session_id)
+function ProfileStore:StartSessionAsync(profile_key, params)
+		return nil
+	local function cancel_condition()
+			return is_user_cancel
+		return true
+				return nil
+							return
+										return
+							return
+				return nil -- Load job stolen
+					return profile
+						return nil
+						return nil
+				return nil -- In this scenario it is likely that this server started shutting down
+				return nil
+	return nil -- Game started shutting down or the request was cancelled - don't return the profile
+function ProfileStore:MessageAsync(profile_key, message)
+		return false
+			return true
+	return false
+function ProfileStore:GetAsync(profile_key, version)
+		return nil
+		return nil -- No version support in mock mode
+				return nil -- Load was successful, but the key was empty - return no profile object
+			return profile
+	return nil -- Game started shutting down - don't return the profile
+function ProfileStore:RemoveAsync(profile_key)
+		return false
+	return wipe_status
+function ProfileVersionQuery.New(profile_store, profile_key, sort_direction, min_date, max_date, is_mock)
+	return self
+function MoveVersionQueryQueue(self) -- Hidden ProfileVersionQuery method
+function ProfileVersionQuery:NextAsync()
+		return nil -- Silently fail :NextAsync() requests
+		return nil -- Silently fail :NextAsync() requests
+	local function query_job()
+			return
+			return
+			return
+			return
+	return profile
+function ProfileStore:VersionQuery(profile_key, sort_direction, min_date, max_date)
+	return ProfileVersionQuery.New(self, profile_key, sort_direction, min_date, max_date, is_mock)
+		return -- Don't wait for profiles to properly save in mock mode so studio could end the simulation faster
+		return -- We're done!
+return ProfileStore
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Packages\Promise.lua
+----------------------------------------
+return require(script.Parent._Index["evaera_promise@4.0.0"]["promise"])
+
+----------------------------------------
+FILE: \src\ReplicatedStorage\Packages\Signal.luau
+----------------------------------------
+return require(script.Parent._Index["sleitnick_signal@2.0.1"]["signal"])
+
+----------------------------------------
+FILE: \src\ServerScriptService\Services\PlanetService.luau
+----------------------------------------
+local PlanetMath = require(ReplicatedStorage.Common.PlanetMath)
+local function PickRandomSkyName(seed)
+	return tostring(idx)
+local function PickRandomBloomPreset(seed, biomeName)
+	return {Brightness = 1.2, BloomIntensity = 0.08, BloomSize = 24, BloomThreshold = 1.3} 
+local function GetGridKey(x, y, z)
+	return x .. "," .. y .. "," .. z
+function PlanetService:Init()
+		return self:GetPlanetsNearPosition(player)
+function PlanetService:Start()
+function PlanetService:GenerateAllPlanets()
+function PlanetService:GeneratePlanetData(gridX, gridY, gridZ)
+	return {
+function PlanetService:GetPlanetsNearPosition(player)
+		return (pa - pos).Magnitude < (pb - pos).Magnitude
+	return nearby
+return PlanetService
+
+----------------------------------------
+FILE: \src\ServerScriptService\Init.server.luau
+----------------------------------------
+		local service = require(module)
+
+----------------------------------------
+FILE: \src\StarterPlayerScripts\Controllers\FlyController.luau
+----------------------------------------
+function FlyController:Start()
+function FlyController:Toggle()
+function FlyController:OnRenderStep(dt: number)
+return FlyController
+
+----------------------------------------
+FILE: \src\StarterPlayerScripts\Controllers\PlanetController.luau
+----------------------------------------
+local Promise = require(ReplicatedStorage.Packages.Promise)
+local PlanetMath = require(ReplicatedStorage.Common.PlanetMath)
+local ObjectPool = require(ReplicatedStorage.Common.ObjectPool)
+local function toColor(t)
+	return Color3.new(t.R, t.G, t.B)
+local function cancelActiveTweens()
+local function tweenProperty(instance, properties)
+local function UpdateLightingEffects(targetConfig)
+local function applySky(skyName)
+function PlanetController:SetupPools()
+local function CreateAtmosphereOnlyModel(data)
+	return model
+function PlanetController:CreatePlanetModel(data)
+	return model
+function PlanetController:UnloadPlanet(key)
+function PlanetController:Start()
+function PlanetController:FetchPlanetsFromServer()
+	return currentFetchPromise
+function PlanetController:HandleCharacterSpawn(char)
+		return self:FetchPlanetsFromServer():andThen(function(planets)
+			return planets
+function PlanetController:RenderPlanets(planets)
+function PlanetController:_GetPlanetKey(data)
+	return data.GridPos.X .. "_" .. data.GridPos.Y .. "_" .. data.GridPos.Z
+function PlanetController:_GetCurrentPlanetInAtmosphere(planets, playerPos)
+	return nil
+return PlanetController
+
+----------------------------------------
+FILE: \src\StarterPlayerScripts\UI\HUD.luau
+----------------------------------------
+local FlyController -- Sáº½ require khi cáº§n
+local function CreateMenuButton(parent, onClick)
+	return btn
+local function CreateFlyIndicator(parent)
+function HUD.Mount(menuApi)
+	return screenGui
+return HUD
+
+----------------------------------------
+FILE: \src\StarterPlayerScripts\UI\InterfaceLoader.client.luau
+----------------------------------------
+local HUD = require(script.Parent.HUD)
+local SciFiMenu = require(script.Parent.SciFiMenu)
+
+----------------------------------------
+FILE: \src\StarterPlayerScripts\UI\SciFiMenu.luau
+----------------------------------------
+local function CreateTab(labelName, parent, onClick)
+	return {
+function SciFiMenu.Mount()
+	local function SetTab(name)
+	function api.SetVisible(visible)
+	function api.Toggle()
+	return api
+return SciFiMenu
+
+----------------------------------------
+FILE: \src\StarterPlayerScripts\Init.client.luau
+----------------------------------------
+		local controller = require(module)
